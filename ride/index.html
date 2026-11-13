@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pose Rider</title>
+  <meta name="description" content="A bike riding game you steer with your hands, using MediaPipe body tracking in the browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <div id="hud" class="hidden">
+    <div class="hud-box"><span class="label">Score</span><span id="hud-score">0</span></div>
+    <div class="hud-box"><span class="label">Distance</span><span id="hud-dist">0 m</span></div>
+    <div class="hud-box"><span class="label">Speed</span><span id="hud-speed">0 km/h</span></div>
+    <div class="hud-box"><span class="label">Lives</span><span id="hud-lives"></span></div>
+  </div>
+
+  <div id="corner">
+    <button id="settings-btn" type="button" title="Steering settings" aria-label="Steering settings">⚙</button>
+    <button id="view-btn" type="button" title="Switch camera view (V)" aria-label="Switch camera view">FPV</button>
+  </div>
+
+  <div id="steer" class="hidden" aria-hidden="true">
+    <svg viewBox="0 0 220 70">
+      <g id="steer-bar">
+        <path d="M18 46 Q30 22 110 24 Q190 22 202 46" fill="none" stroke="#2b2d42" stroke-width="9" stroke-linecap="round"/>
+        <rect x="4" y="38" width="30" height="16" rx="8" fill="#e63946"/>
+        <rect x="186" y="38" width="30" height="16" rx="8" fill="#e63946"/>
+        <circle cx="110" cy="26" r="9" fill="#2b2d42"/>
+      </g>
+    </svg>
+  </div>
+
+  <div id="cam" class="hidden">
+    <video id="cam-video" playsinline muted></video>
+    <canvas id="cam-canvas"></canvas>
+    <div id="cam-badge">Starting…</div>
+  </div>
+
+  <div id="big" class="hidden"></div>
+
+  <div id="overlay"><div class="panel" id="panel"></div></div>
+
+  <div id="settings" class="hidden" role="dialog" aria-label="Steering settings"><div class="panel" id="settings-panel"></div></div>
+</body>
+</html>

@@ -334,7 +334,7 @@ function showMenu(error = '') {
     <p class="fine">No webcam? Use your phone's camera over Wi-Fi. Video goes directly from phone to computer, and nothing is uploaded. Keyboard: ← → or A / D. Touch: hold the left or right side of the screen. Press V or the FPV button for a first-person view.</p>
     ${best ? `<p class="best">Best score: ${best}</p>` : ''}
     ${error ? `<p class="error">${esc(error)}</p>` : ''}
-    <p class="switch-game">${CAR ? '<a href="./">← Play Pose Rider (bike)</a>' : '<a href="car.html">Play Pose Driver, the car version →</a>'}</p>
+    <p class="switch-game">${CAR ? '<a href="./">Play Pose Rider (bike)</a>' : '<a href="car.html">Play Pose Driver, the car version</a>'} · <a href="../">All games</a></p>
   `);
   $('btn-settings').onclick = showSettings;
   $('btn-camera').onclick = startCamera;
