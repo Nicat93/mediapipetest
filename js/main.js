@@ -29,6 +29,8 @@ let holdTime = 0; // generic "hold this gesture" timer
 let handsLost = 0;
 let countdownShown = -1;
 let best = loadBest();
+game.setView(loadView());
+updateViewButton();
 let last = performance.now();
 
 const keys = { left: false, right: false };
@@ -99,6 +101,32 @@ function saveBest(v) {
   }
 }
 
+function loadView() {
+  try {
+    return localStorage.getItem('pose-rider-view') || 'third';
+  } catch {
+    return 'third';
+  }
+}
+function toggleView() {
+  const view = game.toggleView();
+  try {
+    localStorage.setItem('pose-rider-view', view);
+  } catch {
+    /* storage unavailable: view choice just won't persist */
+  }
+  updateViewButton();
+}
+function updateViewButton() {
+  // The button names the view you switch *to*.
+  $('view-btn').textContent = game.view === 'fpv' ? '3rd' : 'FPV';
+  $('view-btn').title = game.view === 'fpv' ? 'Switch to view from behind (V)' : 'Switch to first-person view (V)';
+}
+$('view-btn').addEventListener('click', (e) => {
+  toggleView();
+  e.currentTarget.blur(); // keep Space/Enter from re-toggling via focus
+});
+
 // ----------------------------------------------------------------- panels
 function showPanel(html) {
   ui.panel.innerHTML = html;
@@ -124,7 +152,7 @@ function showMenu(error = '') {
       <button id="btn-phone">Use phone as camera</button>
       <button id="btn-keys">Use keyboard</button>
     </div>
-    <p class="fine">No webcam? Use your phone's camera over Wi-Fi. Video goes directly from phone to computer, and nothing is uploaded. Keyboard: ← → or A / D. Touch: hold the left or right side of the screen.</p>
+    <p class="fine">No webcam? Use your phone's camera over Wi-Fi. Video goes directly from phone to computer, and nothing is uploaded. Keyboard: ← → or A / D. Touch: hold the left or right side of the screen. Press V or the FPV button for a first-person view.</p>
     ${best ? `<p class="best">Best score: ${best}</p>` : ''}
     ${error ? `<p class="error">${esc(error)}</p>` : ''}
   `);
@@ -392,6 +420,7 @@ const RIGHT_KEYS = ['ArrowRight', 'd', 'D'];
 window.addEventListener('keydown', (e) => {
   if (LEFT_KEYS.includes(e.key)) keys.left = true;
   if (RIGHT_KEYS.includes(e.key)) keys.right = true;
+  if ((e.key === 'v' || e.key === 'V') && !e.repeat) toggleView();
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
     if (state === 'playing') {
       setState('paused');
@@ -449,7 +478,8 @@ function setText(el, key, value) {
 function updateHud(handsOk) {
   const inRun = ['countdown', 'playing', 'paused', 'crashing'].includes(state);
   ui.hud.classList.toggle('hidden', !inRun);
-  ui.steer.classList.toggle('hidden', !(inRun || state === 'calibrate'));
+  // In first-person the real handlebars are on screen, so skip the 2D indicator.
+  ui.steer.classList.toggle('hidden', !(inRun || state === 'calibrate') || game.view === 'fpv');
   ui.steerBar.style.transform = `rotate(${(game.steer * 32).toFixed(1)}deg)`;
 
   if (inRun) {

@@ -38,7 +38,7 @@ html, body {
   position: fixed;
   top: max(12px, env(safe-area-inset-top));
   left: 16px;
-  right: 16px;
+  right: 84px; /* room for the view button */
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -64,6 +64,26 @@ html, body {
 }
 #hud-lives { color: var(--accent); letter-spacing: 2px; }
 #hud-lives .lost { color: #c8cbd6; }
+
+/* ---------- camera view toggle ---------- */
+#view-btn {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: 16px;
+  z-index: 11; /* above menus, so it also works from the start screen */
+  min-width: 60px;
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ink);
+  font: 800 15px "Nunito", system-ui, sans-serif;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+#view-btn:hover { background: #fff; }
+#view-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
 /* ---------- steering indicator ---------- */
 #steer {

@@ -120,6 +120,7 @@ export class Game {
     this.crank = 0;
     this.obstacles = [];
     this.coinsList = [];
+    this.view = 'third'; // 'third' (behind the rider) | 'fpv' (rider's eyes)
 
     this.buildWorld();
     this.buildBike();
@@ -141,6 +142,22 @@ export class Game {
   }
   get kmh() {
     return Math.round(this.speed * 2);
+  }
+
+  /** Switch between the chase camera and the rider's first-person view. */
+  setView(view) {
+    this.view = view === 'fpv' ? 'fpv' : 'third';
+    // The rider's own head, torso and arms would block the first-person camera;
+    // the hands stay visible on the grips.
+    for (const m of this.riderBody) m.visible = this.view !== 'fpv';
+    for (const L of this.limbs) L.arm.visible = this.view !== 'fpv';
+    this.camera.near = this.view === 'fpv' ? 0.05 : 0.1;
+    this.camera.updateProjectionMatrix();
+  }
+
+  toggleView() {
+    this.setView(this.view === 'fpv' ? 'third' : 'fpv');
+    return this.view;
   }
 
   resize() {
@@ -393,6 +410,12 @@ export class Game {
     lid.position.set(0, 1.62, -0.15);
     lid.rotation.x = -0.25;
     lean.add(head, lid);
+    this.riderBody = [torso, head, lid];
+    // First-person camera mount: roughly the rider's eyes, nudged back a little
+    // so the handlebars, hands and front wheel stay in the bottom of the frame.
+    this.eye = new THREE.Object3D();
+    this.eye.position.set(0, 1.55, 0.04);
+    lean.add(this.eye);
 
     this.limbs = [-1, 1].map((side) => {
       const arm = new THREE.Mesh(unitCyl(0.05), shirt);
@@ -701,10 +724,21 @@ export class Game {
     const sx = (Math.random() - 0.5) * sh;
     const sy = (Math.random() - 0.5) * sh;
     const cam = this.camera;
-    cam.position.set(this.camX + sx, 2.5 + sy, this.bikeZ + 5.4);
-    cam.lookAt(this.bikeX * 0.85, 1.05, this.bikeZ - 7);
-    cam.rotateZ(-this.steer * 0.035);
-    const fov = this.baseFov + Math.max(0, this.speed - BASE_SPEED) * 0.45;
+    const fpv = this.view === 'fpv';
+    if (fpv) {
+      // Rider's eyes: follow the bike's heading, take half of its lean so it
+      // feels like riding without being dizzying, plus a little pedalling bob.
+      this.bike.updateMatrixWorld(true);
+      this.eye.getWorldPosition(cam.position);
+      cam.position.x += sx * 0.5;
+      cam.position.y += sy * 0.5 + Math.sin(this.crank * 2) * 0.012 * Math.min(1, this.speed / BASE_SPEED);
+      cam.rotation.set(-0.28, this.bike.rotation.y, this.lean.rotation.z * 0.5, 'YXZ');
+    } else {
+      cam.position.set(this.camX + sx, 2.5 + sy, this.bikeZ + 5.4);
+      cam.lookAt(this.bikeX * 0.85, 1.05, this.bikeZ - 7);
+      cam.rotateZ(-this.steer * 0.035);
+    }
+    const fov = this.baseFov + (fpv ? 14 : 0) + Math.max(0, this.speed - BASE_SPEED) * 0.45;
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov = damp(cam.fov, fov, 3, dt);
       cam.updateProjectionMatrix();

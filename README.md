@@ -5,7 +5,8 @@ A browser bike-riding game you steer with your hands. The webcam image is analys
 and the angle between your wrists becomes the handlebar: tilt it like a steering wheel
 (right hand down = turn right, left hand down = turn left).
 
-- Third-person view from behind the rider (Three.js)
+- Third-person view from behind the rider, or **first-person (FPV)** from the rider's eyes (Three.js).
+  Switch with the **FPV / 3rd** button in the top-right corner or the **V** key; the choice is remembered.
 - Dodge cones, rocks and barriers, collect coins, 3 lives; the speed slowly increases
 - Raise both hands above your head on the game-over screen to ride again
 - **Use your phone as the camera** over Wi-Fi (WebRTC), handy when the PC has no webcam
@@ -52,8 +53,8 @@ then open http://localhost:8000 (camera access is allowed on `localhost`).
 | File | Purpose |
 | --- | --- |
 | `index.html`, `style.css` | Page, HUD and menus |
-| `js/main.js` | Game flow (menu → calibrate → countdown → ride → game over), input, sound |
-| `js/game.js` | Three.js world, bike + rider model, obstacles, collisions, camera |
+| `js/main.js` | Game flow (menu → calibrate → countdown → ride → game over), input, sound, view toggle |
+| `js/game.js` | Three.js world, bike + rider model, obstacles, collisions, chase and first-person cameras |
 | `js/pose.js` | Video source (webcam or phone stream) + MediaPipe Pose Landmarker, wrist angle → steering |
 | `js/phonelink.js` | PC side of the phone link: pairing code, QR code, receiving the WebRTC stream |
 | `phone.html`, `phone.css`, `js/phone.js` | Phone side: opens the camera and streams it to the PC |
