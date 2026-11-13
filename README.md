@@ -1,12 +1,30 @@
-# Pose Rider
+# Pose Rider & Pose Driver
 
-A browser bike-riding game you steer with your hands. The webcam image is analysed locally with
+Two browser games you steer with your hands:
+
+- **Pose Rider** (`index.html`): ride a bike, hands held like gripping handlebars.
+- **Pose Driver** (`car.html`): drive an open-top car, hands held on an imaginary steering wheel at 10 and 2.
+
+Each menu links to the other game.
+
+In both games you steer with your hands. The webcam image is analysed locally with
 [MediaPipe Pose Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker),
 and the angle between your wrists becomes the handlebar: tilt it like a steering wheel
 (right hand down = turn right, left hand down = turn left).
 
-- Third-person view from behind the rider, or **first-person (FPV)** from the rider's eyes (Three.js).
+- Third-person view from behind, or **first-person (FPV)** from the rider's / driver's eyes (Three.js).
   Switch with the **FPV / 3rd** button in the top-right corner or the **V** key; the choice is remembered.
+  In the car's FPV you see the hood, dashboard and the steering wheel turning in the driver's hands.
+- **Steering settings** (⚙ button, the menu or the pause screen), saved separately for each game:
+
+  | Setting | Bike default | Car default | What it does |
+  | --- | --- | --- | --- |
+  | Full turn at | 30° | 45° | Hand tilt that gives a full turn. Lower = more sensitive. |
+  | Dead zone | 4° | 3° | Tilts smaller than this count as straight. |
+  | Turn speed | 1.00× | 1.00× | How fast you move sideways at full turn (camera, keyboard and touch). |
+  | Responsiveness | 9 | 7 | How quickly steering follows your hands. Lower is smoother. |
+
+  The panel shows your live hand tilt and the resulting steering while the camera is on.
 - Dodge cones, rocks and barriers, collect coins, 3 lives; the speed slowly increases
 - Raise both hands above your head on the game-over screen to ride again
 - **Use your phone as the camera** over Wi-Fi (WebRTC), handy when the PC has no webcam
@@ -52,12 +70,12 @@ then open http://localhost:8000 (camera access is allowed on `localhost`).
 
 | File | Purpose |
 | --- | --- |
-| `index.html`, `style.css` | Page, HUD and menus |
-| `js/main.js` | Game flow (menu → calibrate → countdown → ride → game over), input, sound, view toggle |
-| `js/game.js` | Three.js world, bike + rider model, obstacles, collisions, chase and first-person cameras |
+| `index.html`, `car.html`, `style.css` | Bike and car pages (`<body data-vehicle>` picks the vehicle), HUD and menus |
+| `js/main.js` | Game flow (menu → calibrate → countdown → ride → game over), input, sound, view toggle, steering settings |
+| `js/game.js` | Three.js world, bike/car models and per-vehicle tuning (`VEHICLES`), obstacles, collisions, chase and first-person cameras |
 | `js/pose.js` | Video source (webcam or phone stream) + MediaPipe Pose Landmarker, wrist angle → steering |
 | `js/phonelink.js` | PC side of the phone link: pairing code, QR code, receiving the WebRTC stream |
 | `phone.html`, `phone.css`, `js/phone.js` | Phone side: opens the camera and streams it to the PC |
 
 Libraries (Three.js 0.160, MediaPipe tasks-vision 0.10.14, PeerJS 1.5.4, qrcode-generator 1.4.4) and the pose model load from CDNs, so there is no build step.
-Steering sensitivity is set by `DEAD_ZONE_DEG` and `MAX_TILT_DEG` in `js/pose.js`.
+Steering defaults per game are in `DEFAULTS` in `js/main.js`; players change them in the steering settings panel.

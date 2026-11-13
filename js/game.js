@@ -2,15 +2,55 @@
 // obstacles to dodge and coins to collect.
 import * as THREE from 'three';
 
-const ROAD_HALF = 5; // road is 10 units wide
 const TILE = 10; // texture tile length (world units)
 const GROUND_LEN = 420;
 const VIEW_AHEAD = 170; // how far ahead obstacles are spawned
-const IDLE_SPEED = 8;
-const BASE_SPEED = 13;
-const MAX_SPEED = 30;
 const SCENERY_SPAN = 240;
-const BIKE_HALF_W = 0.28;
+
+/**
+ * Per-vehicle tuning. Speeds are world units per second; `turn` is the sideways
+ * speed at full lock: turn[0] + speed * turn[1].
+ */
+const VEHICLES = {
+  bike: {
+    roadHalf: 5, // road is 10 units wide
+    idle: 8,
+    base: 13,
+    max: 30,
+    accel: 0.22,
+    halfW: 0.28,
+    halfL: 0.7,
+    gap: 2.2, // min free gap between obstacles in a row
+    spacing: 1, // multiplier on the distance between obstacle rows
+    kmh: 2,
+    turn: [3, 0.28],
+    cam: { y: 2.5, z: 5.4, lookY: 1.05, lookZ: -7 },
+    // First-person: roughly the rider's eyes, nudged back a little so the
+    // handlebars, hands and front wheel stay in the bottom of the frame.
+    eye: [0, 1.55, 0.04],
+    fpvPitch: -0.28,
+    fpvRoll: 0.5, // share of the bike's lean the camera follows
+    bob: 0.012,
+  },
+  car: {
+    roadHalf: 7,
+    idle: 12,
+    base: 20,
+    max: 44,
+    accel: 0.3,
+    halfW: 0.82,
+    halfL: 1.95,
+    gap: 2.9,
+    spacing: 1.45,
+    kmh: 2.2,
+    turn: [4, 0.26],
+    cam: { y: 3.4, z: 7.8, lookY: 1.0, lookZ: -9 },
+    eye: [0, 1.44, 0.5], // driver's eyes, looking over the wheel and hood
+    fpvPitch: -0.14,
+    fpvRoll: 1,
+    bob: 0.004,
+  },
+};
 
 const UP = new THREE.Vector3(0, 1, 0);
 const tmpDir = new THREE.Vector3();
@@ -92,8 +132,13 @@ const stripeTexture = () =>
   });
 
 export class Game {
-  constructor(container) {
+  /** @param {{vehicle?: 'bike'|'car'}} [opts] */
+  constructor(container, { vehicle = 'bike' } = {}) {
     this.handlers = {};
+    this.vehicle = vehicle === 'car' ? 'car' : 'bike';
+    this.cfg = VEHICLES[this.vehicle];
+    this.turnSpeed = 1; // sensitivity: multiplier on sideways speed
+    this.response = 9; // sensitivity: how quickly steering follows the input
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
     r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     r.outputColorSpace = THREE.SRGBColorSpace;
@@ -112,7 +157,7 @@ export class Game {
 
     this.bikeX = 0;
     this.bikeZ = 0;
-    this.speed = IDLE_SPEED;
+    this.speed = this.cfg.idle;
     this.steer = 0;
     this.camX = 0;
     this.shake = 0;
@@ -123,7 +168,8 @@ export class Game {
     this.view = 'third'; // 'third' (behind the rider) | 'fpv' (rider's eyes)
 
     this.buildWorld();
-    this.buildBike();
+    if (this.vehicle === 'car') this.buildCar();
+    else this.buildBike();
     this.reset();
 
     window.addEventListener('resize', () => this.resize());
@@ -141,16 +187,15 @@ export class Game {
     return Math.floor(this.distance) + this.coins * 25;
   }
   get kmh() {
-    return Math.round(this.speed * 2);
+    return Math.round(this.speed * this.cfg.kmh);
   }
 
   /** Switch between the chase camera and the rider's first-person view. */
   setView(view) {
     this.view = view === 'fpv' ? 'fpv' : 'third';
     // The rider's own head, torso and arms would block the first-person camera;
-    // the hands stay visible on the grips.
-    for (const m of this.riderBody) m.visible = this.view !== 'fpv';
-    for (const L of this.limbs) L.arm.visible = this.view !== 'fpv';
+    // the hands stay visible on the handlebar / steering wheel.
+    for (const m of this.fpvHidden) m.visible = this.view !== 'fpv';
     this.camera.near = this.view === 'fpv' ? 0.05 : 0.1;
     this.camera.updateProjectionMatrix();
   }
@@ -176,7 +221,7 @@ export class Game {
     roadTex.wrapS = THREE.ClampToEdgeWrapping;
     roadTex.repeat.set(1, GROUND_LEN / TILE);
     this.road = new THREE.Mesh(
-      new THREE.PlaneGeometry(ROAD_HALF * 2, GROUND_LEN),
+      new THREE.PlaneGeometry(this.cfg.roadHalf * 2, GROUND_LEN),
       new THREE.MeshLambertMaterial({ map: roadTex }),
     );
     this.road.rotation.x = -Math.PI / 2;
@@ -196,7 +241,7 @@ export class Game {
     this.shoulders = [-1, 1].map((side) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(1.2, GROUND_LEN), shoulderMat);
       m.rotation.x = -Math.PI / 2;
-      m.position.set(side * (ROAD_HALF + 0.6), 0.005, 0);
+      m.position.set(side * (this.cfg.roadHalf + 0.6), 0.005, 0);
       this.scene.add(m);
       return m;
     });
@@ -236,7 +281,7 @@ export class Game {
       const cap = new THREE.Mesh(postCapGeo, capMat);
       cap.position.y = 0.72;
       p.add(body, cap);
-      p.position.set((i % 2 ? 1 : -1) * (ROAD_HALF + 1.0), 0, 15 - Math.floor(i / 2) * TILE);
+      p.position.set((i % 2 ? 1 : -1) * (this.cfg.roadHalf + 1.0), 0, 15 - Math.floor(i / 2) * TILE);
       this.scene.add(p);
       this.posts.push(p);
     }
@@ -328,7 +373,7 @@ export class Game {
 
   placeTree(t, z) {
     const side = Math.random() < 0.5 ? -1 : 1;
-    t.position.set(side * (ROAD_HALF + 3 + Math.random() ** 1.5 * 40), 0, z);
+    t.position.set(side * (this.cfg.roadHalf + 3 + Math.random() ** 1.5 * 40), 0, z);
     t.scale.setScalar(rand(0.75, 1.7));
   }
 
@@ -410,11 +455,9 @@ export class Game {
     lid.position.set(0, 1.62, -0.15);
     lid.rotation.x = -0.25;
     lean.add(head, lid);
-    this.riderBody = [torso, head, lid];
-    // First-person camera mount: roughly the rider's eyes, nudged back a little
-    // so the handlebars, hands and front wheel stay in the bottom of the frame.
-    this.eye = new THREE.Object3D();
-    this.eye.position.set(0, 1.55, 0.04);
+    this.fpvHidden = [torso, head, lid];
+    this.eye = new THREE.Object3D(); // first-person camera mount
+    this.eye.position.set(...this.cfg.eye);
     lean.add(this.eye);
 
     this.limbs = [-1, 1].map((side) => {
@@ -425,6 +468,7 @@ export class Game {
       const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.22), dark);
       const crankArm = new THREE.Mesh(unitCyl(0.018), metal);
       lean.add(arm, hand, thigh, shin, shoe, crankArm);
+      this.fpvHidden.push(arm);
       return {
         side,
         arm,
@@ -474,6 +518,186 @@ export class Game {
     return wheel;
   }
 
+  // ------------------------------------------------------------------ car
+  /** Open-top roadster with a driver; front wheels and steering wheel turn. */
+  buildCar() {
+    const P = (x, y, z) => new THREE.Vector3(x, y, z);
+    const root = (this.bike = new THREE.Group()); // `bike` = vehicle root (shared code paths)
+    const body = (this.lean = new THREE.Group()); // rolls a little in turns
+    root.add(body);
+    this.scene.add(root);
+
+    const paint = lam(0xe63946);
+    const white = lam(0xf4f4f4);
+    const dark = lam(0x23252f);
+    const metal = lam(0xc0c6d0);
+    const box = (w, h, d, mat, x, y, z, parent = body) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(x, y, z);
+      parent.add(m);
+      return m;
+    };
+
+    // Body: chassis, hood, rear deck, cockpit sides, bumpers, lights.
+    box(1.62, 0.42, 3.9, paint, 0, 0.52, 0);
+    box(1.54, 0.12, 1.5, paint, 0, 0.78, -1.15);
+    box(1.54, 0.16, 1.1, paint, 0, 0.8, 1.35);
+    box(0.32, 0.012, 1.5, white, 0, 0.846, -1.15);
+    box(0.32, 0.012, 1.1, white, 0, 0.886, 1.35);
+    for (const x of [-1, 1]) box(0.1, 0.2, 1.4, paint, x * 0.76, 0.83, 0.12);
+    box(1.68, 0.16, 0.14, dark, 0, 0.38, -1.98);
+    box(1.68, 0.16, 0.14, dark, 0, 0.4, 1.98);
+    const headMat = lam(0xfff6c8, { emissive: 0x8a7a3a });
+    const tailMat = lam(0xff3b3b, { emissive: 0x661010 });
+    for (const x of [-1, 1]) {
+      box(0.32, 0.12, 0.04, headMat, x * 0.55, 0.62, -1.96);
+      box(0.3, 0.1, 0.04, tailMat, x * 0.56, 0.64, 1.96);
+    }
+    // Spoiler
+    box(1.56, 0.05, 0.3, dark, 0, 1.1, 1.78);
+    for (const x of [-1, 1]) box(0.06, 0.22, 0.12, dark, x * 0.6, 0.98, 1.78);
+    // Seat + roll bar
+    box(0.6, 0.12, 0.5, dark, 0, 0.62, 0.48);
+    box(0.6, 0.55, 0.12, dark, 0, 0.9, 0.76).rotation.x = -0.15;
+    for (const x of [-1, 1]) box(0.07, 0.5, 0.07, metal, x * 0.36, 1.08, 0.92);
+    box(0.79, 0.07, 0.07, metal, 0, 1.33, 0.92);
+    // Dashboard + windshield
+    box(1.44, 0.14, 0.32, dark, 0, 0.86, -0.42);
+    const glass = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.4, 0.26),
+      new THREE.MeshLambertMaterial({ color: 0xcfeeff, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    glass.position.set(0, 1.03, -0.62);
+    glass.rotation.x = -0.45;
+    body.add(glass);
+    const frameTop = box(1.44, 0.035, 0.035, dark, 0, 1.15, -0.57);
+    frameTop.rotation.x = -0.45;
+
+    // Wheels (on the root so they don't roll with the body). Front ones steer.
+    this.carWheels = [];
+    this.frontSteer = [];
+    for (const x of [-1, 1]) {
+      for (const z of [-1, 1]) {
+        const w = this.makeCarWheel();
+        if (z < 0) {
+          const pivot = new THREE.Group();
+          pivot.position.set(x * 0.84, 0.36, -1.25);
+          pivot.add(w);
+          root.add(pivot);
+          this.frontSteer.push(pivot);
+        } else {
+          w.position.set(x * 0.84, 0.36, 1.25);
+          root.add(w);
+        }
+        this.carWheels.push(w);
+      }
+    }
+
+    // Steering column + wheel. The wheel faces the driver, tilted up.
+    const W = P(0, 0.96, -0.12);
+    const column = new THREE.Mesh(unitCyl(0.03), metal);
+    placeBetween(column, P(0, 0.88, -0.36), W);
+    body.add(column);
+    const mount = new THREE.Group();
+    mount.position.copy(W);
+    mount.rotation.x = -0.6;
+    body.add(mount);
+    const spinner = (this.wheelSpinner = new THREE.Group());
+    mount.add(spinner);
+    const rimR = 0.17;
+    spinner.add(new THREE.Mesh(new THREE.TorusGeometry(rimR, 0.024, 8, 32), dark));
+    const hubCap = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 14), lam(0xe63946));
+    hubCap.rotation.x = Math.PI / 2;
+    spinner.add(hubCap);
+    for (const ang of [Math.PI / 2, -Math.PI / 2, Math.PI]) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(rimR, 0.03, 0.015), metal);
+      spoke.position.set((Math.cos(ang) * rimR) / 2, (Math.sin(ang) * rimR) / 2, 0);
+      spoke.rotation.z = ang;
+      spinner.add(spoke);
+    }
+    const marker = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.035, 0.05), lam(0xffd166));
+    marker.position.set(0, rimR, 0);
+    spinner.add(marker);
+
+    // Driver
+    const shirt = lam(0x2a6fdb);
+    const skin = lam(0xc68642);
+    const helmetMat = lam(0xffd166);
+    const hip = P(0, 0.7, 0.52);
+    const shoulder = P(0, 1.12, 0.56);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1, 0.24), shirt);
+    placeBetween(torso, hip, shoulder);
+    body.add(torso);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), skin);
+    head.position.set(0, 1.3, 0.5);
+    const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.155, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), helmetMat);
+    helmet.position.set(0, 1.32, 0.51);
+    helmet.rotation.x = -0.2;
+    body.add(head, helmet);
+    this.fpvHidden = [torso, head, helmet];
+
+    // Hands hold the wheel at "10 and 2" and turn with it; arms follow.
+    this.carArms = [-1, 1].map((side) => {
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), skin);
+      const a = Math.PI / 2 - side * (Math.PI / 3); // 10 o'clock / 2 o'clock
+      hand.position.set(Math.cos(a) * rimR, Math.sin(a) * rimR, 0.02);
+      spinner.add(hand);
+      const arm = new THREE.Mesh(unitCyl(0.05), shirt);
+      body.add(arm);
+      this.fpvHidden.push(arm);
+      return { hand, arm, shoulder: P(side * 0.2, 1.1, 0.55), pos: new THREE.Vector3() };
+    });
+
+    this.eye = new THREE.Object3D();
+    this.eye.position.set(...this.cfg.eye);
+    body.add(this.eye);
+
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.5, 24),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25, depthWrite: false }),
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.scale.set(2.0, 4.4, 1);
+    shadow.position.y = 0.02;
+    root.add(shadow);
+  }
+
+  makeCarWheel() {
+    const wheel = new THREE.Group();
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.26, 20), lam(0x1b1b1f));
+    tire.rotation.z = Math.PI / 2;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.27, 14), lam(0xc0c6d0));
+    cap.rotation.z = Math.PI / 2;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.34, 0.06), lam(0x777b85));
+    wheel.add(tire, cap, bar);
+    return wheel;
+  }
+
+  updateCar(dt) {
+    const s = this.steer;
+    this.bike.position.set(this.bikeX, 0, this.bikeZ);
+    // Crash: spin out instead of falling over.
+    this.bike.rotation.y = -s * 0.12 + this.crashLean * this.crashDir * 1.4;
+    const offroad = Math.abs(this.bikeX) > this.cfg.roadHalf - 0.35;
+    const rumble = offroad ? Math.sin(this.time * 40) * 0.008 : 0;
+    this.lean.rotation.z = s * 0.05 + rumble;
+    this.lean.position.y = offroad ? Math.abs(Math.sin(this.time * 31)) * 0.02 : 0;
+    this.bike.visible = this.invuln <= 0 || this.crashed || Math.floor(this.time * 14) % 2 === 0;
+
+    const spin = (this.speed * dt) / 0.36;
+    for (const w of this.carWheels) w.rotation.x -= spin;
+    for (const p of this.frontSteer) p.rotation.y = -s * 0.5;
+    this.crank -= spin * 0.3; // engine phase, drives the FPV bob
+    this.wheelSpinner.rotation.z = -s * 1.7; // ~100° at full lock
+
+    this.bike.updateMatrixWorld(true);
+    for (const A of this.carArms) {
+      A.hand.getWorldPosition(A.pos);
+      this.lean.worldToLocal(A.pos);
+      placeBetween(A.arm, A.shoulder, A.pos);
+    }
+  }
+
   // ----------------------------------------------------------- game state
   reset() {
     for (const o of this.obstacles) this.scene.remove(o.mesh);
@@ -509,9 +733,9 @@ export class Game {
       let x;
       let tries = 0;
       do {
-        x = rand(-ROAD_HALF + def.halfW + 0.2, ROAD_HALF - def.halfW - 0.2);
+        x = rand(-this.cfg.roadHalf + def.halfW + 0.2, this.cfg.roadHalf - def.halfW - 0.2);
         tries++;
-      } while (tries < 20 && placed.some((p) => Math.abs(p.x - x) < p.halfW + def.halfW + 2.2));
+      } while (tries < 20 && placed.some((p) => Math.abs(p.x - x) < p.halfW + def.halfW + this.cfg.gap));
       if (tries >= 20) continue;
       const mesh = def.make();
       mesh.position.set(x, 0, z);
@@ -527,13 +751,13 @@ export class Game {
       let x;
       let tries = 0;
       do {
-        x = rand(-ROAD_HALF + 0.8, ROAD_HALF - 0.8);
+        x = rand(-this.cfg.roadHalf + 0.8, this.cfg.roadHalf - 0.8);
         tries++;
       } while (tries < 20 && placed.some((p) => Math.abs(p.x - x) < p.halfW + 1.2));
       if (tries < 20) {
         const drift = Math.random() < 0.4 ? rand(-0.35, 0.35) : 0;
         for (let k = 0; k < 5; k++) {
-          const cx = clamp(x + drift * (k - 2), -ROAD_HALF + 0.6, ROAD_HALF - 0.6);
+          const cx = clamp(x + drift * (k - 2), -this.cfg.roadHalf + 0.6, this.cfg.roadHalf - 0.6);
           if (placed.some((p) => Math.abs(p.x - cx) < p.halfW + 0.6)) continue;
           const mesh = new THREE.Mesh(this.coinGeo, this.coinMat);
           const cz = z + 4 - k * 2;
@@ -554,24 +778,25 @@ export class Game {
     if (mode === 'pause') return;
     this.time += dt;
     const controllable = !this.crashed;
-    this.steer = damp(this.steer, controllable ? clamp(input, -1, 1) : 0, 9, dt);
+    this.steer = damp(this.steer, controllable ? clamp(input, -1, 1) : 0, this.response, dt);
 
-    const offroad = Math.abs(this.bikeX) > ROAD_HALF - 0.35;
+    const offroad = Math.abs(this.bikeX) > this.cfg.roadHalf - 0.35;
     if (this.crashed) {
       this.speed = damp(this.speed, 0, 2.5, dt);
       this.crashLean = damp(this.crashLean, 1.25, 4, dt);
     } else if (mode === 'run' && this.running) {
       this.elapsed += dt;
-      const cruise = Math.min(MAX_SPEED, BASE_SPEED + this.elapsed * 0.22);
+      const cruise = Math.min(this.cfg.max, this.cfg.base + this.elapsed * this.cfg.accel);
       const target = offroad ? cruise * 0.5 : cruise;
       this.speed = damp(this.speed, target, this.speed < target ? 0.7 : 2.5, dt);
     } else {
-      this.speed = damp(this.speed, IDLE_SPEED, 1.2, dt);
+      this.speed = damp(this.speed, this.cfg.idle, 1.2, dt);
     }
 
     if (controllable) {
-      this.bikeX += this.steer * (3 + this.speed * 0.28) * dt;
-      this.bikeX = clamp(this.bikeX, -ROAD_HALF - 0.6, ROAD_HALF + 0.6);
+      const [t0, t1] = this.cfg.turn;
+      this.bikeX += this.steer * (t0 + this.speed * t1) * this.turnSpeed * dt;
+      this.bikeX = clamp(this.bikeX, -this.cfg.roadHalf - 0.6, this.cfg.roadHalf + 0.6);
     }
     this.bikeZ -= this.speed * dt;
 
@@ -580,7 +805,7 @@ export class Game {
       while (this.nextSpawnZ > this.bikeZ - VIEW_AHEAD) {
         this.spawnRow(this.nextSpawnZ);
         const difficulty = clamp(this.distance / 2500, 0, 1);
-        this.nextSpawnZ -= rand(18, 26) - difficulty * 9;
+        this.nextSpawnZ -= (rand(18, 26) - difficulty * 9) * this.cfg.spacing;
       }
       this.checkCollisions();
     }
@@ -590,14 +815,15 @@ export class Game {
 
     this.updateEntities(dt);
     this.updateScenery();
-    this.updateBike(dt);
+    if (this.vehicle === 'car') this.updateCar(dt);
+    else this.updateBike(dt);
     this.updateCamera(dt);
   }
 
   checkCollisions() {
     for (const o of this.obstacles) {
       if (o.hit || this.invuln > 0) continue;
-      if (Math.abs(o.z - this.bikeZ) < 0.7 && Math.abs(o.x - this.bikeX) < o.halfW + BIKE_HALF_W) {
+      if (Math.abs(o.z - this.bikeZ) < this.cfg.halfL && Math.abs(o.x - this.bikeX) < o.halfW + this.cfg.halfW) {
         o.hit = true;
         o.vel.set(Math.sign(o.x - this.bikeX || 1) * rand(3, 6), 6, -this.speed * 0.6);
         o.spin = rand(4, 9);
@@ -617,7 +843,7 @@ export class Game {
     }
     for (const c of this.coinsList) {
       if (c.taken) continue;
-      if (Math.abs(c.z - this.bikeZ) < 0.8 && Math.abs(c.x - this.bikeX) < 0.7) {
+      if (Math.abs(c.z - this.bikeZ) < this.cfg.halfL + 0.1 && Math.abs(c.x - this.bikeX) < this.cfg.halfW + 0.42) {
         c.taken = true;
         this.coins += 1;
         this.emit('coin', this.coins);
@@ -684,7 +910,7 @@ export class Game {
     const s = this.steer;
     this.bike.position.set(this.bikeX, 0, this.bikeZ);
     this.bike.rotation.y = -s * 0.18;
-    const wobble = Math.abs(this.bikeX) > ROAD_HALF - 0.35 ? Math.sin(this.time * 40) * 0.015 : 0;
+    const wobble = Math.abs(this.bikeX) > this.cfg.roadHalf - 0.35 ? Math.sin(this.time * 40) * 0.015 : 0;
     this.lean.rotation.z = -s * 0.42 + wobble - this.crashLean * this.crashDir;
     this.steerGroup.rotation.y = -s * 0.45;
     this.bike.visible = this.invuln <= 0 || this.crashed || Math.floor(this.time * 14) % 2 === 0;
@@ -731,14 +957,15 @@ export class Game {
       this.bike.updateMatrixWorld(true);
       this.eye.getWorldPosition(cam.position);
       cam.position.x += sx * 0.5;
-      cam.position.y += sy * 0.5 + Math.sin(this.crank * 2) * 0.012 * Math.min(1, this.speed / BASE_SPEED);
-      cam.rotation.set(-0.28, this.bike.rotation.y, this.lean.rotation.z * 0.5, 'YXZ');
+      cam.position.y += sy * 0.5 + Math.sin(this.crank * 2) * this.cfg.bob * Math.min(1, this.speed / this.cfg.base);
+      cam.rotation.set(this.cfg.fpvPitch, this.bike.rotation.y, this.lean.rotation.z * this.cfg.fpvRoll, 'YXZ');
     } else {
-      cam.position.set(this.camX + sx, 2.5 + sy, this.bikeZ + 5.4);
-      cam.lookAt(this.bikeX * 0.85, 1.05, this.bikeZ - 7);
+      const c = this.cfg.cam;
+      cam.position.set(this.camX + sx, c.y + sy, this.bikeZ + c.z);
+      cam.lookAt(this.bikeX * 0.85, c.lookY, this.bikeZ + c.lookZ);
       cam.rotateZ(-this.steer * 0.035);
     }
-    const fov = this.baseFov + (fpv ? 14 : 0) + Math.max(0, this.speed - BASE_SPEED) * 0.45;
+    const fov = this.baseFov + (fpv ? 14 : 0) + Math.max(0, this.speed - this.cfg.base) * 0.45;
     if (Math.abs(cam.fov - fov) > 0.01) {
       cam.fov = damp(cam.fov, fov, 3, dt);
       cam.updateProjectionMatrix();

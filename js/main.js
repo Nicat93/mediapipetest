@@ -3,7 +3,72 @@ import { Game } from './game.js';
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-const game = new Game($('scene'));
+// Same engine for both games; the page picks the vehicle with <body data-vehicle>.
+const VEHICLE = document.body.dataset.vehicle === 'car' ? 'car' : 'bike';
+const CAR = VEHICLE === 'car';
+const T = CAR
+  ? {
+      title: 'Pose Driver',
+      storage: 'pose-driver',
+      noun: 'car',
+      go: 'Drive with camera',
+      verb: 'driving',
+      steerDeg: 95, // rotation of the 2D steering-wheel indicator at full lock
+    }
+  : {
+      title: 'Pose Rider',
+      storage: 'pose-rider',
+      noun: 'bike',
+      go: 'Ride with camera',
+      verb: 'riding',
+      steerDeg: 32,
+    };
+
+// Steering sensitivity. maxTilt/deadZone apply to camera steering; turnSpeed and
+// response apply to every input (camera, keyboard, touch).
+const DEFAULTS = CAR
+  ? { maxTilt: 45, deadZone: 3, turnSpeed: 1, response: 7 }
+  : { maxTilt: 30, deadZone: 4, turnSpeed: 1, response: 9 };
+const SETTINGS_SPEC = [
+  {
+    key: 'maxTilt',
+    label: 'Full turn at',
+    min: 10,
+    max: 80,
+    step: 1,
+    fmt: (v) => `${v}°`,
+    help: `How far you turn your hands for a full turn. Lower = more sensitive.`,
+  },
+  {
+    key: 'deadZone',
+    label: 'Dead zone',
+    min: 0,
+    max: 15,
+    step: 0.5,
+    fmt: (v) => `${v}°`,
+    help: 'Small hand tilts below this count as going straight.',
+  },
+  {
+    key: 'turnSpeed',
+    label: 'Turn speed',
+    min: 0.4,
+    max: 2,
+    step: 0.05,
+    fmt: (v) => `${v.toFixed(2)}×`,
+    help: `How fast the ${CAR ? 'car' : 'bike'} moves sideways at full turn (also keyboard and touch).`,
+  },
+  {
+    key: 'response',
+    label: 'Responsiveness',
+    min: 2,
+    max: 20,
+    step: 0.5,
+    fmt: (v) => String(v),
+    help: 'Higher reacts faster; lower is smoother but lags a little.',
+  },
+];
+
+const game = new Game($('scene'), { vehicle: VEHICLE });
 const ui = {
   overlay: $('overlay'),
   panel: $('panel'),
@@ -29,8 +94,12 @@ let holdTime = 0; // generic "hold this gesture" timer
 let handsLost = 0;
 let countdownShown = -1;
 let best = loadBest();
+let settings = loadSettings();
+let settingsOpen = false;
+let liveSteer = 0; // last raw steering input, shown in the settings panel
 game.setView(loadView());
 updateViewButton();
+applySettings();
 let last = performance.now();
 
 const keys = { left: false, right: false };
@@ -88,14 +157,14 @@ game.on('over', () => {
 // ---------------------------------------------------------------- storage
 function loadBest() {
   try {
-    return Number(localStorage.getItem('pose-rider-best')) || 0;
+    return Number(localStorage.getItem(`${T.storage}-best`)) || 0;
   } catch {
     return 0;
   }
 }
 function saveBest(v) {
   try {
-    localStorage.setItem('pose-rider-best', String(v));
+    localStorage.setItem(`${T.storage}-best`, String(v));
   } catch {
     /* storage unavailable: best score just won't persist */
   }
@@ -103,7 +172,7 @@ function saveBest(v) {
 
 function loadView() {
   try {
-    return localStorage.getItem('pose-rider-view') || 'third';
+    return localStorage.getItem(`${T.storage}-view`) || 'third';
   } catch {
     return 'third';
   }
@@ -111,7 +180,7 @@ function loadView() {
 function toggleView() {
   const view = game.toggleView();
   try {
-    localStorage.setItem('pose-rider-view', view);
+    localStorage.setItem(`${T.storage}-view`, view);
   } catch {
     /* storage unavailable: view choice just won't persist */
   }
@@ -127,6 +196,105 @@ $('view-btn').addEventListener('click', (e) => {
   e.currentTarget.blur(); // keep Space/Enter from re-toggling via focus
 });
 
+// --------------------------------------------------------------- settings
+function loadSettings() {
+  const out = { ...DEFAULTS };
+  try {
+    const saved = JSON.parse(localStorage.getItem(`${T.storage}-settings`) || '{}');
+    for (const spec of SETTINGS_SPEC) {
+      const v = Number(saved[spec.key]);
+      if (Number.isFinite(v)) out[spec.key] = clamp(v, spec.min, spec.max);
+    }
+  } catch {
+    /* corrupt or unavailable storage: use defaults */
+  }
+  return out;
+}
+function saveSettings() {
+  try {
+    localStorage.setItem(`${T.storage}-settings`, JSON.stringify(settings));
+  } catch {
+    /* storage unavailable: settings last for this visit only */
+  }
+}
+function applySettings() {
+  game.turnSpeed = settings.turnSpeed;
+  game.response = settings.response;
+  if (pose) {
+    pose.deadZone = settings.deadZone;
+    pose.maxTilt = Math.max(settings.maxTilt, settings.deadZone + 1);
+  }
+}
+
+function showSettings() {
+  settingsOpen = true;
+  const panel = $('settings-panel');
+  panel.innerHTML = `
+    <h2>Steering settings</h2>
+    ${SETTINGS_SPEC.map(
+      (sp) => `
+      <label class="setting">
+        <span class="set-head"><span>${sp.label}</span><output id="out-${sp.key}"></output></span>
+        <input type="range" id="set-${sp.key}" min="${sp.min}" max="${sp.max}" step="${sp.step}">
+        <span class="fine">${sp.help}</span>
+      </label>`,
+    ).join('')}
+    <div class="meter" aria-hidden="true"><div id="set-meter"></div></div>
+    <p class="fine" id="set-live"></p>
+    <div class="buttons">
+      <button class="primary" id="set-done">Done</button>
+      <button id="set-reset">Reset to defaults</button>
+    </div>`;
+  const sync = () => {
+    for (const sp of SETTINGS_SPEC) {
+      $(`set-${sp.key}`).value = settings[sp.key];
+      $(`out-${sp.key}`).textContent = sp.fmt(settings[sp.key]);
+    }
+  };
+  for (const sp of SETTINGS_SPEC) {
+    $(`set-${sp.key}`).addEventListener('input', (e) => {
+      settings[sp.key] = Number(e.target.value);
+      $(`out-${sp.key}`).textContent = sp.fmt(settings[sp.key]);
+      applySettings();
+      saveSettings();
+    });
+  }
+  $('set-done').onclick = hideSettings;
+  $('set-reset').onclick = () => {
+    settings = { ...DEFAULTS };
+    applySettings();
+    saveSettings();
+    sync();
+  };
+  sync();
+  $('settings').classList.remove('hidden');
+  $('set-done').focus();
+}
+function hideSettings() {
+  settingsOpen = false;
+  $('settings').classList.add('hidden');
+}
+function updateSettingsLive(handsOk) {
+  const meter = $('set-meter');
+  const live = $('set-live');
+  if (!meter || !live) return;
+  meter.style.left = `${50 + clamp(liveSteer, -1, 1) * 50}%`;
+  let text;
+  if (pose && source) {
+    text = handsOk
+      ? `Your tilt: ${Math.round(pose.tiltDeg)}° → steering ${Math.round(pose.steer * 100)}%`
+      : 'Show both hands to the camera to try your settings.';
+  } else {
+    text = 'Start the camera to see your live hand tilt here. Arrow keys work too.';
+  }
+  if (live.textContent !== text) live.textContent = text;
+}
+$('settings-btn').addEventListener('click', (e) => {
+  if (settingsOpen) hideSettings();
+  else showSettings();
+  e.currentTarget.blur();
+});
+
 // ----------------------------------------------------------------- panels
 function showPanel(html) {
   ui.panel.innerHTML = html;
@@ -139,23 +307,36 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 function showMenu(error = '') {
   showPanel(`
-    <h1>Pose Rider</h1>
-    <p class="tag">Ride through the countryside, steering the bike with your hands. Your webcam tracks your body with MediaPipe, right in the browser.</p>
+    <h1>${T.title}</h1>
+    ${
+      CAR
+        ? `<p class="tag">Drive down the country road, steering with an imaginary wheel. Your webcam tracks your body with MediaPipe, right in the browser.</p>
+    <ol class="how">
+      <li>Stand back so your head, shoulders and hands are in view.</li>
+      <li>Hold both hands out in front of you as if gripping a steering wheel at <b>10 and 2</b>.</li>
+      <li>Turn the wheel: <b>right hand down = right</b>, <b>left hand down = left</b>.</li>
+      <li>Dodge cones, rocks and barriers. Grab the coins!</li>
+    </ol>`
+        : `<p class="tag">Ride through the countryside, steering the bike with your hands. Your webcam tracks your body with MediaPipe, right in the browser.</p>
     <ol class="how">
       <li>Stand back so your head, shoulders and hands are in view.</li>
       <li>Hold both fists out in front of you, about shoulder-width apart, as if gripping handlebars.</li>
       <li>Tilt them like a steering wheel: <b>right hand down = right</b>, <b>left hand down = left</b>.</li>
       <li>Dodge cones, rocks and barriers. Grab the coins!</li>
-    </ol>
+    </ol>`
+    }
     <div class="buttons">
-      <button class="primary" id="btn-camera">Ride with camera</button>
+      <button class="primary" id="btn-camera">${T.go}</button>
       <button id="btn-phone">Use phone as camera</button>
       <button id="btn-keys">Use keyboard</button>
+      <button id="btn-settings">Steering settings</button>
     </div>
     <p class="fine">No webcam? Use your phone's camera over Wi-Fi. Video goes directly from phone to computer, and nothing is uploaded. Keyboard: ← → or A / D. Touch: hold the left or right side of the screen. Press V or the FPV button for a first-person view.</p>
     ${best ? `<p class="best">Best score: ${best}</p>` : ''}
     ${error ? `<p class="error">${esc(error)}</p>` : ''}
+    <p class="switch-game">${CAR ? '<a href="./">← Play Pose Rider (bike)</a>' : '<a href="car.html">Play Pose Driver, the car version →</a>'}</p>
   `);
+  $('btn-settings').onclick = showSettings;
   $('btn-camera').onclick = startCamera;
   $('btn-phone').onclick = startPhone;
   $('btn-keys').onclick = startKeyboard;
@@ -164,11 +345,16 @@ function showMenu(error = '') {
 
 function showCalibrate() {
   showPanel(`
-    <h2>Grab the handlebars</h2>
-    <p>Hold both hands out in front of you, shoulder-width apart and at the same height, like gripping a handlebar. Keep them still.</p>
+    ${
+      CAR
+        ? `<h2>Grab the wheel</h2>
+    <p>Hold both hands out in front of you at the same height, as if holding a steering wheel at 10 and 2. Keep them still.</p>`
+        : `<h2>Grab the handlebars</h2>
+    <p>Hold both hands out in front of you, shoulder-width apart and at the same height, like gripping a handlebar. Keep them still.</p>`
+    }
     <div class="progress"><div id="calib-bar"></div></div>
     <p class="hint" id="calib-hint">Looking for you…</p>
-    <p class="fine">Tip: the yellow line in the camera preview is your handlebar. Try tilting it to steer the bike now.</p>
+    <p class="fine">Tip: the yellow line in the camera preview joins your hands. Try turning it to steer the ${T.noun} now. Too twitchy or too slow? Open <b>⚙ Steering settings</b>.</p>
   `);
 }
 
@@ -176,14 +362,15 @@ function showPaused() {
   showPanel(
     mode === 'camera'
       ? `<h2>Paused</h2>
-         <p>Lost sight of your hands. Hold them out in front of you to keep riding.</p>
+         <p>Lost sight of your hands. Hold them out in front of you to keep ${T.verb}.</p>
          <p class="hint bad" id="pause-hint">Show both hands</p>
-         <div class="buttons"><button id="btn-menu">Quit to menu</button></div>`
+         <div class="buttons"><button id="btn-settings">Steering settings</button><button id="btn-menu">Quit to menu</button></div>`
       : `<h2>Paused</h2>
-         <div class="buttons"><button class="primary" id="btn-resume">Resume</button><button id="btn-menu">Quit to menu</button></div>
+         <div class="buttons"><button class="primary" id="btn-resume">Resume</button><button id="btn-settings">Steering settings</button><button id="btn-menu">Quit to menu</button></div>
          <p class="fine">Press P or Esc to resume.</p>`,
   );
   $('btn-menu').onclick = toMenu;
+  $('btn-settings').onclick = showSettings;
   const r = $('btn-resume');
   if (r) {
     r.onclick = resume;
@@ -232,6 +419,7 @@ async function ensurePose() {
   if (!pose) {
     const { PoseController } = await import('./pose.js');
     pose = new PoseController($('cam-video'), $('cam-canvas'));
+    applySettings();
   }
   return pose;
 }
@@ -421,6 +609,10 @@ window.addEventListener('keydown', (e) => {
   if (LEFT_KEYS.includes(e.key)) keys.left = true;
   if (RIGHT_KEYS.includes(e.key)) keys.right = true;
   if ((e.key === 'v' || e.key === 'V') && !e.repeat) toggleView();
+  if (settingsOpen) {
+    if (e.key === 'Escape') hideSettings();
+    return;
+  }
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
     if (state === 'playing') {
       setState('paused');
@@ -480,7 +672,7 @@ function updateHud(handsOk) {
   ui.hud.classList.toggle('hidden', !inRun);
   // In first-person the real handlebars are on screen, so skip the 2D indicator.
   ui.steer.classList.toggle('hidden', !(inRun || state === 'calibrate') || game.view === 'fpv');
-  ui.steerBar.style.transform = `rotate(${(game.steer * 32).toFixed(1)}deg)`;
+  ui.steerBar.style.transform = `rotate(${(game.steer * T.steerDeg).toFixed(1)}deg)`;
 
   if (inRun) {
     setText(ui.score, 'score', String(game.score));
@@ -525,6 +717,13 @@ function loop(now) {
   }
   const manual = clamp((keys.right ? 1 : 0) - (keys.left ? 1 : 0) + touchDir, -1, 1);
   if (manual) steerIn = manual;
+  liveSteer = steerIn;
+
+  // Settings opened mid-run: pause underneath so nothing happens unseen.
+  if (settingsOpen && state === 'playing') {
+    setState('paused');
+    showPaused();
+  }
 
   let gameMode = 'idle';
   switch (state) {
@@ -537,7 +736,7 @@ function loop(now) {
 
     case 'calibrate': {
       const level = handsOk && Math.abs(pose.steer) < 0.35;
-      holdTime = level ? holdTime + dt : Math.max(0, holdTime - dt * 2);
+      holdTime = level && !settingsOpen ? holdTime + dt : Math.max(0, holdTime - dt * 2);
       const bar = $('calib-bar');
       const hint = $('calib-hint');
       if (bar) bar.style.width = `${clamp(holdTime / 1.2, 0, 1) * 100}%`;
@@ -596,7 +795,7 @@ function loop(now) {
     case 'paused':
       gameMode = 'pause';
       if (mode === 'camera') {
-        holdTime = handsOk ? holdTime + dt : 0;
+        holdTime = handsOk && !settingsOpen ? holdTime + dt : 0;
         const hint = $('pause-hint');
         if (hint) {
           hint.textContent = handsOk ? 'Hands found, resuming…' : 'Show both hands';
@@ -616,7 +815,7 @@ function loop(now) {
 
     case 'over':
       if (pose && source) {
-        holdTime = pose.handsUp ? holdTime + dt : Math.max(0, holdTime - dt * 2);
+        holdTime = pose.handsUp && !settingsOpen ? holdTime + dt : Math.max(0, holdTime - dt * 2);
         const bar = $('raise-bar');
         if (bar) bar.style.width = `${clamp(holdTime, 0, 1) * 100}%`;
         if (holdTime >= 1) restart();
@@ -627,6 +826,7 @@ function loop(now) {
   game.update(dt, steerIn, gameMode);
   game.render();
   updateHud(handsOk);
+  if (settingsOpen) updateSettingsLive(handsOk);
 }
 
 showMenu();

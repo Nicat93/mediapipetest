@@ -1,4 +1,4 @@
-// Webcam + MediaPipe Pose Landmarker -> handlebar steering.
+// Webcam + MediaPipe Pose Landmarker -> handlebar / steering-wheel steering.
 import {
   PoseLandmarker,
   FilesetResolver,
@@ -14,8 +14,9 @@ const NOSE = 0;
 const L_WRIST = 15;
 const R_WRIST = 16;
 
-const DEAD_ZONE_DEG = 4; // tilt smaller than this counts as straight
-const MAX_TILT_DEG = 30; // tilt at which steering is fully locked
+// Defaults; the games override these from their steering settings.
+export const DEAD_ZONE_DEG = 4; // tilt smaller than this counts as straight
+export const MAX_TILT_DEG = 30; // tilt at which steering is fully locked
 const HANDS_GRACE_MS = 350; // keep "hands visible" through brief dropouts
 
 export class PoseController {
@@ -28,6 +29,8 @@ export class PoseController {
     this.lastVideoTime = -1;
     this.lastHandsSeen = -Infinity;
     this.steer = 0; // -1 (left) .. 1 (right)
+    this.deadZone = DEAD_ZONE_DEG;
+    this.maxTilt = MAX_TILT_DEG;
     this.tiltDeg = 0;
     this.handsUp = false; // both wrists above the nose
     this.status = 'none'; // 'none' | 'body' | 'hands'
@@ -153,7 +156,7 @@ export class PoseController {
     // Positive angle = right hand lower than left = turn right (like a steering wheel).
     const deg = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
     this.tiltDeg = deg;
-    const mag = Math.max(0, Math.abs(deg) - DEAD_ZONE_DEG) / (MAX_TILT_DEG - DEAD_ZONE_DEG);
+    const mag = Math.max(0, Math.abs(deg) - this.deadZone) / Math.max(1, this.maxTilt - this.deadZone);
     this.steer = Math.sign(deg) * Math.min(1, mag);
 
     const nose = lm[NOSE];

@@ -38,7 +38,7 @@ html, body {
   position: fixed;
   top: max(12px, env(safe-area-inset-top));
   left: 16px;
-  right: 84px; /* room for the view button */
+  right: 150px; /* room for the corner buttons */
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -65,13 +65,17 @@ html, body {
 #hud-lives { color: var(--accent); letter-spacing: 2px; }
 #hud-lives .lost { color: #c8cbd6; }
 
-/* ---------- camera view toggle ---------- */
-#view-btn {
+/* ---------- corner buttons: settings + camera view ---------- */
+#corner {
   position: fixed;
   top: max(12px, env(safe-area-inset-top));
   right: 16px;
-  z-index: 11; /* above menus, so it also works from the start screen */
-  min-width: 60px;
+  z-index: 13; /* above menus and settings, so they work from any screen */
+  display: flex;
+  gap: 8px;
+}
+#corner button {
+  min-width: 52px;
   height: 44px;
   padding: 0 12px;
   border: 0;
@@ -82,8 +86,9 @@ html, body {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
   cursor: pointer;
 }
-#view-btn:hover { background: #fff; }
-#view-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+#settings-btn { font-size: 22px; padding: 0; }
+#corner button:hover { background: #fff; }
+#corner button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
 /* ---------- steering indicator ---------- */
 #steer {
@@ -154,7 +159,7 @@ html, body {
 }
 
 /* ---------- overlay panels ---------- */
-#overlay {
+#overlay, #settings {
   position: fixed;
   inset: 0;
   display: grid;
@@ -164,6 +169,37 @@ html, body {
   z-index: 10;
   overflow-y: auto;
 }
+#settings { z-index: 12; padding-top: 70px; }
+.setting { display: block; text-align: left; margin: 12px 0; }
+.set-head { display: flex; justify-content: space-between; font-weight: 800; }
+.set-head output { color: var(--accent); font-variant-numeric: tabular-nums; }
+.setting input[type="range"] { width: 100%; margin: 6px 0 2px; accent-color: var(--accent); }
+.setting .fine { display: block; margin: 0; }
+.meter {
+  position: relative;
+  height: 12px;
+  margin: 16px 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e8ebf3 49.5%, var(--muted) 49.5% 50.5%, #e8ebf3 50.5%);
+}
+.meter > div {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.switch-game { margin-top: 14px; font-weight: 800; }
+.switch-game a { color: var(--accent); text-decoration: none; }
+.switch-game a:hover { text-decoration: underline; }
+
+/* car: the steering indicator is a round wheel */
+.car #steer { width: 110px; }
+.car #steer-bar { transform-origin: 60px 60px; }
 .panel {
   width: 100%;
   max-width: 520px;
@@ -319,4 +355,8 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 @media (max-width: 600px) {
   .pair { flex-direction: column; text-align: center; }
   #cam.portrait { width: 96px; }
+}
+
+@media (max-width: 600px) {
+  .car #steer { width: 80px; }
 }
