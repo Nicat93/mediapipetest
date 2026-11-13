@@ -1,0 +1,266 @@
+:root {
+  --ink: #2b2d42;
+  --muted: #5c6178;
+  --accent: #e63946;
+  --accent-dark: #b92b37;
+  --gold: #ffb703;
+  --ok: #2a9d8f;
+  --card: #ffffff;
+  --sky: #a8d8ff;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sky);
+  color: var(--ink);
+  font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
+#scene, #scene canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- HUD ---------- */
+#hud {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: none;
+}
+.hud-box {
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 12px;
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 86px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-weight: 800;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.hud-box .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+#hud-lives { color: var(--accent); letter-spacing: 2px; }
+#hud-lives .lost { color: #c8cbd6; }
+
+/* ---------- steering indicator ---------- */
+#steer {
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  width: 200px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
+}
+#steer svg { width: 100%; display: block; overflow: visible; }
+#steer-bar { transform-origin: 110px 35px; transform-box: view-box; }
+
+/* ---------- camera preview ---------- */
+#cam {
+  position: fixed;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 220px;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 3px solid #fff;
+  background: #111;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  z-index: 5;
+}
+#cam video, #cam canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+#cam-badge {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--accent);
+}
+#cam-badge.ok { background: var(--ok); }
+
+/* ---------- countdown ---------- */
+#big {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: "Lilita One", "Nunito", sans-serif;
+  font-size: min(32vw, 220px);
+  color: #fff;
+  text-shadow: 0 6px 0 var(--accent-dark), 0 12px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 6;
+}
+#big.pop { animation: pop 0.9s ease-out; }
+@keyframes pop {
+  0% { transform: scale(1.6); opacity: 0; }
+  25% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.9; }
+}
+
+/* ---------- overlay panels ---------- */
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: linear-gradient(rgba(20, 30, 60, 0.15), rgba(20, 30, 60, 0.45));
+  z-index: 10;
+  overflow-y: auto;
+}
+.panel {
+  width: 100%;
+  max-width: 520px;
+  background: var(--card);
+  border-radius: 22px;
+  padding: 26px 26px 22px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.panel h1, .panel h2 {
+  font-family: "Lilita One", "Nunito", sans-serif;
+  font-weight: 400;
+  margin: 0 0 6px;
+  line-height: 1.05;
+}
+.panel h1 { font-size: clamp(40px, 11vw, 60px); color: var(--accent); letter-spacing: 0.01em; }
+.panel h2 { font-size: 34px; }
+.panel p { margin: 8px 0; line-height: 1.45; }
+.tag { color: var(--muted); font-size: 16px; }
+.how {
+  text-align: left;
+  margin: 16px 0;
+  padding: 14px 16px 14px 36px;
+  background: #f3f5fb;
+  border-radius: 14px;
+  line-height: 1.5;
+}
+.how li + li { margin-top: 4px; }
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 16px;
+}
+button {
+  font: inherit;
+  font-weight: 800;
+  font-size: 17px;
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 22px;
+  cursor: pointer;
+  background: #e8ebf3;
+  color: var(--ink);
+  transition: transform 0.1s, background 0.15s;
+}
+button:hover { background: #dde1ec; }
+button:active { transform: scale(0.97); }
+button.primary { background: var(--accent); color: #fff; box-shadow: 0 4px 0 var(--accent-dark); }
+button.primary:hover { background: #ef4552; }
+button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.fine { font-size: 13px; color: var(--muted); }
+.error {
+  background: #fde8ea;
+  color: var(--accent-dark);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.spinner {
+  width: 46px;
+  height: 46px;
+  margin: 10px auto 14px;
+  border-radius: 50%;
+  border: 5px solid #e8ebf3;
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.progress {
+  height: 14px;
+  background: #e8ebf3;
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 14px 0 6px;
+}
+.progress > div {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--ok), #57cc99);
+  border-radius: 999px;
+  transition: width 0.1s linear;
+}
+.hint { font-weight: 800; min-height: 1.4em; }
+.hint.bad { color: var(--accent); }
+.hint.good { color: var(--ok); }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+.stats div {
+  background: #f3f5fb;
+  border-radius: 12px;
+  padding: 10px 4px;
+  font-weight: 800;
+  font-size: 22px;
+}
+.stats span {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.best { color: var(--gold); font-weight: 800; }
+
+@media (max-width: 600px) {
+  #cam { width: 132px; right: 12px; }
+  .hud-box { font-size: 16px; min-width: 70px; padding: 5px 9px; }
+  #steer { width: 150px; left: 16px; transform: none; }
+  .panel { padding: 20px 18px 18px; }
+}
