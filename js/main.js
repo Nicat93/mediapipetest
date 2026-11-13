@@ -19,8 +19,10 @@ const ui = {
   big: $('big'),
 };
 
-let pose = null; // PoseController once the camera is running
-let mode = 'keyboard'; // 'camera' | 'keyboard'
+let pose = null; // PoseController (created once; keeps the loaded model)
+let source = null; // video source feeding pose: null | 'webcam' | 'phone'
+let phoneLink = null; // PhoneLink while a phone is paired / being paired
+let mode = 'keyboard'; // 'camera' (webcam or phone) | 'keyboard'
 let state = 'menu'; // menu | loading | calibrate | countdown | playing | paused | crashing | over
 let stateTime = 0;
 let holdTime = 0; // generic "hold this gesture" timer
@@ -119,13 +121,15 @@ function showMenu(error = '') {
     </ol>
     <div class="buttons">
       <button class="primary" id="btn-camera">Ride with camera</button>
+      <button id="btn-phone">Use phone as camera</button>
       <button id="btn-keys">Use keyboard</button>
     </div>
-    <p class="fine">The video stays on your device; nothing is uploaded. Keyboard: ← → or A / D. Touch: hold the left or right side of the screen.</p>
+    <p class="fine">No webcam? Use your phone's camera over Wi-Fi. Video goes directly from phone to computer, and nothing is uploaded. Keyboard: ← → or A / D. Touch: hold the left or right side of the screen.</p>
     ${best ? `<p class="best">Best score: ${best}</p>` : ''}
     ${error ? `<p class="error">${esc(error)}</p>` : ''}
   `);
   $('btn-camera').onclick = startCamera;
+  $('btn-phone').onclick = startPhone;
   $('btn-keys').onclick = startKeyboard;
   $('btn-camera').focus();
 }
@@ -196,41 +200,151 @@ function setState(s) {
   holdTime = 0;
 }
 
+async function ensurePose() {
+  if (!pose) {
+    const { PoseController } = await import('./pose.js');
+    pose = new PoseController($('cam-video'), $('cam-canvas'));
+  }
+  return pose;
+}
+
+function setLoadStatus(msg) {
+  const el = $('load-status');
+  if (el) el.textContent = msg;
+}
+
 async function startCamera() {
   audio();
+  stopSources();
   mode = 'camera';
   setState('loading');
   showPanel(`<div class="spinner"></div><h2>Getting ready</h2><p id="load-status">Loading…</p>`);
   try {
-    if (!pose) {
-      const { PoseController } = await import('./pose.js');
-      pose = new PoseController($('cam-video'), $('cam-canvas'));
-      ui.cam.classList.remove('hidden');
-      await pose.init((msg) => {
-        const el = $('load-status');
-        if (el) el.textContent = msg;
-      });
-    }
+    await ensurePose();
+    await pose.init(setLoadStatus);
+    source = 'webcam';
+    ui.cam.classList.remove('hidden');
     game.reset();
     setState('calibrate');
     showCalibrate();
   } catch (err) {
     console.error(err);
-    ui.cam.classList.add('hidden');
-    stopCamera();
+    stopSources();
     let msg = err?.message || String(err);
     if (err?.name === 'NotAllowedError') msg = 'Camera permission was denied. Allow camera access in your browser and try again.';
-    if (err?.name === 'NotFoundError') msg = 'No camera was found on this device.';
+    if (err?.name === 'NotFoundError') msg = 'No camera was found on this device. Try "Use phone as camera".';
     setState('menu');
     showMenu(`Couldn't start the camera: ${msg}`);
   }
 }
 
-function stopCamera() {
-  const stream = $('cam-video').srcObject;
-  stream?.getTracks().forEach((t) => t.stop());
-  $('cam-video').srcObject = null;
-  pose = null;
+// ----- phone camera over WebRTC
+async function startPhone() {
+  audio();
+  stopSources();
+  mode = 'camera';
+  setState('pairing');
+  showPanel(`<div class="spinner"></div><h2>Phone camera</h2><p id="load-status">Connecting to the pairing service…</p>`);
+  try {
+    await ensurePose();
+    pose.loadModel().catch((err) => console.error(err)); // load while the phone connects
+    const { PhoneLink, qrSvg } = await import('./phonelink.js');
+    const link = (phoneLink = new PhoneLink());
+    link.onStream = (stream) => link === phoneLink && phoneConnected(stream);
+    link.onDisconnect = () => link === phoneLink && phoneDisconnected();
+    await link.open();
+    if (link !== phoneLink) return; // user left meanwhile
+    link.qr = await qrSvg(link.phoneUrl).catch(() => '');
+    if (link !== phoneLink) return;
+    showPairing();
+  } catch (err) {
+    console.error(err);
+    stopSources();
+    setState('menu');
+    showMenu(`Couldn't set up the phone link: ${err?.message || err?.type || err}`);
+  }
+}
+
+function showPairing(note = '') {
+  const url = phoneLink.phoneUrl;
+  const qr = phoneLink.qr || '';
+  const local = ['localhost', '127.0.0.1', ''].includes(location.hostname) || location.protocol !== 'https:';
+  showPanel(`
+    <h2>Use your phone as the camera</h2>
+    ${note ? `<p class="error">${esc(note)}</p>` : ''}
+    <div class="pair">
+      <div class="qr">${qr}</div>
+      <div class="pair-info">
+        <p>Scan with your phone's camera, or open the link below and enter the code:</p>
+        <div class="code">${esc(phoneLink.code)}</div>
+        <a class="link" href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/#.*/, ''))}</a>
+      </div>
+    </div>
+    <p class="fine">Phone and computer should be on the same Wi-Fi. Allow camera access on the phone, then prop it up 1.5–2 m away facing you.</p>
+    ${
+      local
+        ? `<p class="error">This page isn't on https, so the phone may refuse to open its camera. Use the GitHub Pages version.</p>`
+        : ''
+    }
+    <p class="hint" id="pair-status">Waiting for phone…</p>
+    <div class="buttons"><button id="btn-menu">Cancel</button></div>
+  `);
+  $('btn-menu').onclick = toMenu;
+}
+
+async function phoneConnected(stream) {
+  await pose.setStream(stream);
+  source = 'phone';
+  ui.cam.classList.remove('hidden');
+  const status = $('pair-status');
+  if (status) {
+    status.textContent = 'Phone connected! Loading body tracking…';
+    status.className = 'hint good';
+  }
+  try {
+    await pose.loadModel();
+  } catch (err) {
+    console.error(err);
+    stopSources();
+    setState('menu');
+    showMenu(`Couldn't load body tracking: ${err?.message || err}`);
+    return;
+  }
+  if (state === 'pairing' || state === 'calibrate') {
+    game.reset();
+    setState('calibrate');
+    showCalibrate();
+  } else if (state === 'paused') {
+    // Reconnected mid-ride: the pause screen resumes once hands are visible again.
+    showPaused();
+  }
+}
+
+const PHONE_LOST = 'The phone disconnected. Scan the code again (or tap Reconnect on the phone).';
+
+function phoneDisconnected() {
+  pose?.stopStream();
+  source = null;
+  ui.cam.classList.add('hidden');
+  if (['countdown', 'playing', 'paused'].includes(state)) {
+    ui.big.classList.add('hidden');
+    if (state === 'countdown' && !game.running) {
+      setState('pairing');
+    } else {
+      setState('paused');
+    }
+  } else if (state !== 'over' && state !== 'crashing') {
+    setState('pairing');
+  }
+  if (state !== 'over' && state !== 'crashing') showPairing(PHONE_LOST);
+}
+
+function stopSources() {
+  phoneLink?.close();
+  phoneLink = null;
+  pose?.stopStream();
+  source = null;
+  ui.cam.classList.add('hidden');
 }
 
 function startKeyboard() {
@@ -248,6 +362,13 @@ function beginCountdown() {
 
 function restart() {
   audio();
+  if (mode === 'camera' && phoneLink && !source) {
+    // Phone dropped while on the game-over screen: pair again first.
+    game.reset();
+    setState('pairing');
+    showPairing(PHONE_LOST);
+    return;
+  }
   game.reset();
   beginCountdown();
 }
@@ -258,6 +379,7 @@ function resume() {
 }
 
 function toMenu() {
+  stopSources();
   game.reset();
   ui.big.classList.add('hidden');
   setState('menu');
@@ -341,7 +463,13 @@ function updateHud(handsOk) {
     }
   }
 
-  if (pose) {
+  if (pose && source) {
+    const v = pose.video;
+    if (v.videoWidth && hudCache.aspect !== v.videoWidth / v.videoHeight) {
+      hudCache.aspect = v.videoWidth / v.videoHeight;
+      ui.cam.style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`;
+      ui.cam.classList.toggle('portrait', v.videoHeight > v.videoWidth);
+    }
     const label = handsOk ? 'Hands ✓' : pose.status === 'body' ? 'Show both hands' : 'Step into view';
     setText(ui.camBadge, 'badge', label);
     ui.camBadge.classList.toggle('ok', handsOk);
@@ -356,7 +484,7 @@ function loop(now) {
 
   let handsOk = false;
   let steerIn = 0;
-  if (pose) {
+  if (pose && source) {
     try {
       pose.update(now);
     } catch (err) {
@@ -372,6 +500,7 @@ function loop(now) {
   switch (state) {
     case 'menu':
     case 'loading':
+    case 'pairing':
       // Attract mode: gently weave down the road.
       steerIn = manual || Math.sin(now / 1500) * 0.35 - game.bikeX * 0.08;
       break;
@@ -456,7 +585,7 @@ function loop(now) {
       break;
 
     case 'over':
-      if (pose) {
+      if (pose && source) {
         holdTime = pose.handsUp ? holdTime + dt : Math.max(0, holdTime - dt * 2);
         const bar = $('raise-bar');
         if (bar) bar.style.width = `${clamp(holdTime, 0, 1) * 100}%`;

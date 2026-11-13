@@ -33,27 +33,53 @@ export class PoseController {
     this.status = 'none'; // 'none' | 'body' | 'hands'
   }
 
-  async init(onStatus = () => {}) {
+  /** Load the pose model (once). Safe to call repeatedly. */
+  loadModel() {
+    this.modelPromise ||= FilesetResolver.forVisionTasks(WASM_PATH).then((fileset) =>
+      this.createLandmarker(fileset),
+    );
+    return this.modelPromise;
+  }
+
+  /** Use this computer's webcam. */
+  async useWebcam(onStatus = () => {}) {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('This browser does not support camera access.');
     }
     onStatus('Asking for camera permission…');
-    const camera = navigator.mediaDevices
-      .getUserMedia({
-        audio: false,
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-      })
-      .then(async (stream) => {
-        this.video.srcObject = stream;
-        await this.video.play();
-        onStatus('Loading body tracking model…');
-      });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+    });
+    await this.setStream(stream);
+  }
 
-    const model = FilesetResolver.forVisionTasks(WASM_PATH).then((fileset) => this.createLandmarker(fileset));
+  /** Use any MediaStream as the video source (e.g. a phone camera received over WebRTC). */
+  async setStream(stream) {
+    this.stopStream();
+    this.video.srcObject = stream;
+    this.lastVideoTime = -1;
+    this.lastHandsSeen = -Infinity;
+    this.status = 'none';
+    try {
+      await this.video.play();
+    } catch (err) {
+      console.warn('video.play() failed', err);
+    }
+  }
 
-    await Promise.all([camera, model]);
-    this.canvas.width = this.video.videoWidth || 640;
-    this.canvas.height = this.video.videoHeight || 480;
+  stopStream() {
+    const old = this.video.srcObject;
+    if (old) old.getTracks().forEach((t) => t.stop());
+    this.video.srcObject = null;
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  async init(onStatus = () => {}) {
+    const model = this.loadModel();
+    await this.useWebcam(onStatus);
+    onStatus('Loading body tracking model…');
+    await model;
   }
 
   async createLandmarker(fileset) {
@@ -79,7 +105,15 @@ export class PoseController {
 
   update(now) {
     const v = this.video;
-    if (!this.landmarker || v.readyState < 2 || v.currentTime === this.lastVideoTime) return;
+    if (!this.landmarker || !v.srcObject || v.readyState < 2) return;
+    // A remote (phone) track goes "muted" when frames stop arriving: don't keep
+    // tracking the last frozen frame, so the game pauses instead.
+    const track = v.srcObject.getVideoTracks?.()[0];
+    if (track && (track.muted || track.readyState === 'ended')) {
+      this.status = 'none';
+      return;
+    }
+    if (v.currentTime === this.lastVideoTime) return;
     this.lastVideoTime = v.currentTime;
 
     if (this.canvas.width !== v.videoWidth && v.videoWidth) {
