@@ -3,6 +3,7 @@
 // collect coins. Your avatar is your own skeleton.
 import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs';
 import { createCamera } from './camera.js';
+import { livesPicker, heartsText } from './lives.js';
 
 const WASM_PATH = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm';
 const MODEL_URL =
@@ -17,7 +18,6 @@ const BONES = [
 ];
 
 // ---- tuning ----
-const START_LIVES = 3;
 const LANE_ENTER = 0.75;   // hip offset (in shoulder widths) to move into a side lane
 const LANE_EXIT = 0.45;    // ...and to come back to the middle
 const LANE_STEP = 1.0;     // hip offset (in shoulder widths) that puts the avatar in the middle of a side lane
@@ -44,6 +44,8 @@ const hud = document.getElementById('hud');
 const scoreEl = document.getElementById('score');
 const distEl = document.getElementById('dist');
 const livesEl = document.getElementById('lives');
+const getMaxLives = livesPicker(document.getElementById('lives-pick'), 'neondash.lives');
+let maxLives = getMaxLives();
 
 let landmarker = null;
 let looping = false;
@@ -64,7 +66,7 @@ let lane = 0, laneVis = 0, bodyX = 0, jumping = false, ducking = false;
 let state = 'idle'; // idle | frame | calibrate | countdown | play | over
 let stateTime = 0, lostFor = 0;
 let gt = 0, speed = 0, distance = 0, nextRowIn = 0;
-let score = 0, bonus = 0, coins = 0, lives = START_LIVES, invul = 0, shake = 0, flash = 0;
+let score = 0, bonus = 0, coins = 0, lives = maxLives, invul = 0, shake = 0, flash = 0;
 let objects = [], effects = [];
 
 // ---------- setup ----------
@@ -138,7 +140,7 @@ startBtn.addEventListener('click', async () => {
 function setState(s) { state = s; stateTime = 0; }
 
 function newGame() {
-  score = 0; bonus = 0; coins = 0; lives = START_LIVES; invul = 0; shake = 0; flash = 0;
+  score = 0; bonus = 0; coins = 0; maxLives = getMaxLives(); lives = maxLives; invul = 0; shake = 0; flash = 0;
   objects = []; effects = []; gt = 0; distance = 0; speed = 0; nextRowIn = 0;
   lane = 0; laneVis = 0; bodyX = 0; base = null; calib = [];
   overlay.hidden = true;
@@ -169,7 +171,7 @@ function gameOver() {
 function updateHud() {
   scoreEl.textContent = String(score);
   distEl.textContent = `${Math.floor(distance)} m`;
-  livesEl.textContent = '♥'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, START_LIVES - lives));
+  livesEl.textContent = heartsText(lives, maxLives);
 }
 
 // ---------- tracking ----------

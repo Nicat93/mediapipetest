@@ -87,7 +87,7 @@ html, body {
 }
 
 .cam-pick { display: flex; flex-direction: column; gap: 6px; font-size: 14px; opacity: 0.9; }
-#camera {
+#camera, #lives-pick {
   font: inherit;
   font-size: 16px;
   max-width: min(360px, 90vw);

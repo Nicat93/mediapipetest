@@ -139,6 +139,7 @@ export class Game {
     this.cfg = VEHICLES[this.vehicle];
     this.turnSpeed = 1; // sensitivity: multiplier on sideways speed
     this.response = 9; // sensitivity: how quickly steering follows the input
+    this.maxLives = 3; // lives per run (Infinity allowed), set from the settings
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
     r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     r.outputColorSpace = THREE.SRGBColorSpace;
@@ -704,7 +705,7 @@ export class Game {
     for (const c of this.coinsList) this.scene.remove(c.mesh);
     this.obstacles = [];
     this.coinsList = [];
-    this.lives = 3;
+    this.lives = this.maxLives;
     this.coins = 0;
     this.distance = 0;
     this.elapsed = 0;

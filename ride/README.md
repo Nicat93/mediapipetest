@@ -15,7 +15,7 @@ and the angle between your wrists becomes the handlebar: tilt it like a steering
 - Third-person view from behind, or **first-person (FPV)** from the rider's / driver's eyes (Three.js).
   Switch with the **FPV / 3rd** button in the top-right corner or the **V** key; the choice is remembered.
   In the car's FPV you see the hood, dashboard and the steering wheel turning in the driver's hands.
-- **Steering settings** (⚙ button, the menu or the pause screen), saved separately for each game:
+- **Settings** (⚙ button, the menu or the pause screen), saved separately for each game:
 
   | Setting | Bike default | Car default | What it does |
   | --- | --- | --- | --- |
@@ -23,6 +23,7 @@ and the angle between your wrists becomes the handlebar: tilt it like a steering
   | Dead zone | 4° | 3° | Tilts smaller than this count as straight. |
   | Turn speed | 1.00× | 1.00× | How fast you move sideways at full turn (camera, keyboard and touch). |
   | Responsiveness | 9 | 7 | How quickly steering follows your hands. Lower is smoother. |
+  | Lives | 3 | 3 | Crashes allowed per run, 1–10, or ∞ (slider all the way right). Applies from the next start. |
 
   The panel shows your live hand tilt and the resulting steering while the camera is on.
 - Dodge cones, rocks and barriers, collect coins, 3 lives; the speed slowly increases
@@ -71,11 +72,11 @@ from the repository root, then open http://localhost:8000/ride/ (camera access i
 | File | Purpose |
 | --- | --- |
 | `index.html`, `car.html`, `style.css` | Bike and car pages (`<body data-vehicle>` picks the vehicle), HUD and menus |
-| `js/main.js` | Game flow (menu → calibrate → countdown → ride → game over), input, sound, view toggle, steering settings |
+| `js/main.js` | Game flow (menu → calibrate → countdown → ride → game over), input, sound, view toggle, settings (steering, lives) |
 | `js/game.js` | Three.js world, bike/car models and per-vehicle tuning (`VEHICLES`), obstacles, collisions, chase and first-person cameras |
 | `js/pose.js` | Video source (webcam or phone stream) + MediaPipe Pose Landmarker, wrist angle → steering |
 | `js/phonelink.js` | PC side of the phone link: pairing code, QR code, receiving the WebRTC stream |
 | `phone.html`, `phone.css`, `js/phone.js` | Phone side: opens the camera and streams it to the PC |
 
 Libraries (Three.js 0.160, MediaPipe tasks-vision 0.10.14, PeerJS 1.5.4, qrcode-generator 1.4.4) and the pose model load from CDNs, so there is no build step.
-Steering defaults per game are in `DEFAULTS` in `js/main.js`; players change them in the steering settings panel.
+Steering defaults per game are in `DEFAULTS` in `js/main.js`; players change them in the settings panel.

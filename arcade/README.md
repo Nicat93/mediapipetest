@@ -10,6 +10,9 @@ Three fast camera games: Bubble Pop (hands), Body Blitz and Neon Dash (full body
 
 Stand 2–3 m back for the full-body games so your whole body is in view.
 
+Body Blitz and Neon Dash have a **Lives** picker on the start screen: 1, 2, 3 (default), 5, 10 or ∞ infinite.
+The choice is remembered separately for each game. Bubble Pop is a 60-second round, so it has no lives.
+
 ## Camera
 
 Pick the camera on each game's start screen; the choice is shared by all three games.

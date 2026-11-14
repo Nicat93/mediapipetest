@@ -1,8 +1,9 @@
 // Body Blitz — full-body game using MediaPipe Pose Landmarker.
 // Hit blue targets with your hands, orange targets with your feet,
-// and duck under the red lasers. Three lives.
+// and duck under the red lasers. Lives are picked on the start screen (1–10 or infinite).
 import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs';
 import { createCamera } from './camera.js';
+import { livesPicker, heartsText } from './lives.js';
 
 const WASM_PATH = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm';
 const MODEL_URL =
@@ -16,7 +17,6 @@ const FOOT_POINTS = [27, 28, 31, 32]; // ankles + toes
 const KEY_POINTS = [NOSE, L_SHOULDER, R_SHOULDER, L_HIP, R_HIP, L_ANKLE, R_ANKLE];
 
 const COLORS = { hand: '#4cc9f0', foot: '#ff9f1c', laser: '#ff3b5c', ok: '#7ee787' };
-const START_LIVES = 3;
 const TARGET_LIFE = 3.2; // seconds
 const LASER_WARN = 1.6;
 const LASER_FIRE = 0.35;
@@ -32,6 +32,8 @@ const hud = document.getElementById('hud');
 const scoreEl = document.getElementById('score');
 const multEl = document.getElementById('mult');
 const livesEl = document.getElementById('lives');
+const getMaxLives = livesPicker(document.getElementById('lives-pick'), 'bodyblitz.lives');
+let maxLives = getMaxLives();
 
 let landmarker = null;
 let looping = false;
@@ -45,7 +47,7 @@ let state = 'idle';
 let gt = 0;           // game time in seconds; only advances while playing with the body in view
 let stateTime = 0;    // seconds spent in the current state
 let lostFor = 0;      // seconds the body has been out of view
-let score = 0, combo = 0, lives = START_LIVES;
+let score = 0, combo = 0, lives = maxLives;
 let targets = [], effects = [], laser = null;
 let nextSpawn = 0, nextLaser = 0, hurtFlash = 0;
 
@@ -125,7 +127,7 @@ function setState(s) {
 }
 
 function newGame() {
-  score = 0; combo = 0; lives = START_LIVES;
+  score = 0; combo = 0; maxLives = getMaxLives(); lives = maxLives;
   targets = []; effects = []; laser = null;
   gt = 0; nextSpawn = 1; nextLaser = 9; lostFor = 0; hurtFlash = 0;
   overlay.hidden = true;
@@ -158,7 +160,7 @@ const multiplier = () => Math.min(5, 1 + Math.floor(combo / 5));
 function updateHud() {
   scoreEl.textContent = String(score);
   multEl.textContent = `x${multiplier()}`;
-  livesEl.textContent = '♥'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, START_LIVES - lives));
+  livesEl.textContent = heartsText(lives, maxLives);
 }
 
 // ---------- tracking ----------

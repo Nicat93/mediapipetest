@@ -27,8 +27,10 @@ const T = CAR
 // Steering sensitivity. maxTilt/deadZone apply to camera steering; turnSpeed and
 // response apply to every input (camera, keyboard, touch).
 const DEFAULTS = CAR
-  ? { maxTilt: 45, deadZone: 3, turnSpeed: 1, response: 7 }
-  : { maxTilt: 30, deadZone: 4, turnSpeed: 1, response: 9 };
+  ? { maxTilt: 45, deadZone: 3, turnSpeed: 1, response: 7, lives: 3 }
+  : { maxTilt: 30, deadZone: 4, turnSpeed: 1, response: 9, lives: 3 };
+const INFINITE_LIVES = 11; // the last step of the Lives slider means infinite
+const maxLivesOf = (v) => (v >= INFINITE_LIVES ? Infinity : v);
 const SETTINGS_SPEC = [
   {
     key: 'maxTilt',
@@ -65,6 +67,15 @@ const SETTINGS_SPEC = [
     step: 0.5,
     fmt: (v) => String(v),
     help: 'Higher reacts faster; lower is smoother but lags a little.',
+  },
+  {
+    key: 'lives',
+    label: 'Lives',
+    min: 1,
+    max: INFINITE_LIVES,
+    step: 1,
+    fmt: (v) => (v >= INFINITE_LIVES ? '∞' : String(v)),
+    help: 'Crashes allowed before the game ends. Slide all the way right for infinite. Applies from the next start.',
   },
 ];
 
@@ -220,6 +231,7 @@ function saveSettings() {
 function applySettings() {
   game.turnSpeed = settings.turnSpeed;
   game.response = settings.response;
+  game.maxLives = maxLivesOf(settings.lives);
   if (pose) {
     pose.deadZone = settings.deadZone;
     pose.maxTilt = Math.max(settings.maxTilt, settings.deadZone + 1);
@@ -230,7 +242,7 @@ function showSettings() {
   settingsOpen = true;
   const panel = $('settings-panel');
   panel.innerHTML = `
-    <h2>Steering settings</h2>
+    <h2>Settings</h2>
     ${SETTINGS_SPEC.map(
       (sp) => `
       <label class="setting">
@@ -329,7 +341,7 @@ function showMenu(error = '') {
       <button class="primary" id="btn-camera">${T.go}</button>
       <button id="btn-phone">Use phone as camera</button>
       <button id="btn-keys">Use keyboard</button>
-      <button id="btn-settings">Steering settings</button>
+      <button id="btn-settings">Settings</button>
     </div>
     <p class="fine">No webcam? Use your phone's camera over Wi-Fi. Video goes directly from phone to computer, and nothing is uploaded. Keyboard: ← → or A / D. Touch: hold the left or right side of the screen. Press V or the FPV button for a first-person view.</p>
     ${best ? `<p class="best">Best score: ${best}</p>` : ''}
@@ -354,7 +366,7 @@ function showCalibrate() {
     }
     <div class="progress"><div id="calib-bar"></div></div>
     <p class="hint" id="calib-hint">Looking for you…</p>
-    <p class="fine">Tip: the yellow line in the camera preview joins your hands. Try turning it to steer the ${T.noun} now. Too twitchy or too slow? Open <b>⚙ Steering settings</b>.</p>
+    <p class="fine">Tip: the yellow line in the camera preview joins your hands. Try turning it to steer the ${T.noun} now. Too twitchy or too slow? Open <b>⚙ Settings</b>.</p>
   `);
 }
 
@@ -364,9 +376,9 @@ function showPaused() {
       ? `<h2>Paused</h2>
          <p>Lost sight of your hands. Hold them out in front of you to keep ${T.verb}.</p>
          <p class="hint bad" id="pause-hint">Show both hands</p>
-         <div class="buttons"><button id="btn-settings">Steering settings</button><button id="btn-menu">Quit to menu</button></div>`
+         <div class="buttons"><button id="btn-settings">Settings</button><button id="btn-menu">Quit to menu</button></div>`
       : `<h2>Paused</h2>
-         <div class="buttons"><button class="primary" id="btn-resume">Resume</button><button id="btn-settings">Steering settings</button><button id="btn-menu">Quit to menu</button></div>
+         <div class="buttons"><button class="primary" id="btn-resume">Resume</button><button id="btn-settings">Settings</button><button id="btn-menu">Quit to menu</button></div>
          <p class="fine">Press P or Esc to resume.</p>`,
   );
   $('btn-menu').onclick = toMenu;
@@ -678,7 +690,10 @@ function updateHud(handsOk) {
     setText(ui.score, 'score', String(game.score));
     setText(ui.dist, 'dist', `${Math.floor(game.distance)} m`);
     setText(ui.speed, 'speed', `${game.kmh} km/h`);
-    const hearts = '♥'.repeat(Math.max(0, game.lives)) + `<span class="lost">${'♥'.repeat(3 - Math.max(0, game.lives))}</span>`;
+    const hearts =
+      game.maxLives === Infinity
+        ? '♥ ∞'
+        : '♥'.repeat(Math.max(0, game.lives)) + `<span class="lost">${'♥'.repeat(Math.max(0, game.maxLives - game.lives))}</span>`;
     if (hudCache.lives !== hearts) {
       hudCache.lives = hearts;
       ui.lives.innerHTML = hearts;
