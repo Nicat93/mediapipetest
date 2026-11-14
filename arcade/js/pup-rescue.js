@@ -74,11 +74,6 @@ let objects = [], effects = [], decorIn = 0;
 // Pup choice (buttons on the start screen, each with a little preview of the pup)
 let pupKind = 'fire';
 try { if (localStorage.getItem(PUP_KEY) === 'police') pupKind = 'police'; } catch {}
-const PREVIEW_POSE = {
-  0: [0, -1.68], 2: [-0.07, -1.72], 5: [0.07, -1.72], 11: [-0.24, -1.38], 12: [0.24, -1.38],
-  13: [-0.36, -1.05], 14: [0.36, -1.05], 15: [-0.4, -0.75], 16: [0.4, -0.75],
-  23: [-0.15, -0.9], 24: [0.15, -0.9], 25: [-0.17, -0.48], 26: [0.17, -0.48], 27: [-0.18, -0.08], 28: [0.18, -0.08],
-};
 const pupButtons = [...document.querySelectorAll('.pup-pick button')];
 function choosePup(kind) {
   pupKind = kind;
@@ -91,16 +86,10 @@ for (const b of pupButtons) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   cv.width = 120 * dpr; cv.height = 150 * dpr;
   const c = cv.getContext('2d');
-  const u = 54 * dpr;
+  const u = 72 * dpr;
   const draw = (t) => {
     c.clearRect(0, 0, cv.width, cv.height);
-    const wave = Math.sin(t * 3) * 0.12; // a little wave of the paw
-    drawPup(c, (i) => {
-      const [x, y] = PREVIEW_POSE[i] || [0, -1];
-      const dy = i === 16 ? -0.55 + wave : i === 14 ? -0.25 : 0;
-      const dx = i === 16 ? 0.08 : 0;
-      return { x: cv.width / 2 + (x + dx) * u, y: cv.height - 10 * dpr + (y + dy) * u };
-    }, u, b.dataset.pup, t);
+    drawDogFront(c, cv.width / 2, cv.height - 8 * dpr, u, b.dataset.pup, t);
   };
   const tick = (now) => { if (!overlay.hidden) draw(now / 1000); requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
@@ -783,8 +772,8 @@ function drawDecor(o) {
 }
 
 // ---------- the pups ----------
-// Two original pups: a firefighter corgi and a police beagle. Their body follows
-// your pose (shoulders, elbows, wrists, hips, knees, ankles, head tilt).
+// Two original pups: a firefighter corgi and a police beagle, drawn as real
+// four-legged dogs. Your body only steers them (lane, lean, duck).
 
 export const PUPS = {
   fire: {
@@ -799,29 +788,6 @@ export const PUPS = {
   },
 };
 
-const ELB_L = 13, ELB_R = 14, KNEE_L = 25, KNEE_R = 26, EYE_L = 2, EYE_R = 5;
-
-function limb(c, a, b, color, w, outline) {
-  c.strokeStyle = outline;
-  c.lineWidth = w + 2 * Math.max(1.5, w * 0.12);
-  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
-  c.strokeStyle = color;
-  c.lineWidth = w;
-  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
-}
-
-function paw(c, p, r, color, outline, t) {
-  c.beginPath();
-  c.ellipse(p.x, p.y, r, r * 0.8, 0, 0, Math.PI * 2);
-  c.fillStyle = color; c.fill();
-  c.strokeStyle = outline; c.lineWidth = Math.max(1.5, r * 0.18); c.stroke();
-  c.strokeStyle = 'rgba(0,0,0,0.25)';
-  c.lineWidth = Math.max(1, r * 0.1);
-  for (const dx of [-0.3, 0.3]) {
-    c.beginPath(); c.moveTo(p.x + dx * r, p.y + r * 0.1); c.lineTo(p.x + dx * r, p.y + r * 0.65); c.stroke();
-  }
-}
-
 function star(c, x, y, r, fill, stroke) {
   c.beginPath();
   for (let i = 0; i < 10; i++) {
@@ -833,100 +799,141 @@ function star(c, x, y, r, fill, stroke) {
   c.strokeStyle = stroke; c.lineWidth = Math.max(1, r * 0.12); c.stroke();
 }
 
-/**
- * Draws a pup.
- * @param c     canvas 2D context
- * @param P     (landmarkIndex) => {x, y} screen point
- * @param u     pixels per world unit (the pup is ~1.9 units tall)
- * @param kind  'fire' | 'police'
- * @param time  seconds, for the tail wag and tongue
- */
-export function drawPup(c, P, u, kind, time = 0, highlight = null) {
-  const k = PUPS[kind] || PUPS.fire;
-  const ol = '#1b2440';
-  const shL = P(L_SH), shR = P(R_SH), hipL = P(L_HIP), hipR = P(R_HIP);
-  const elL = P(ELB_L), elR = P(ELB_R), wrL = P(L_WR), wrR = P(R_WR);
-  const knL = P(KNEE_L), knR = P(KNEE_R), anL = P(L_ANK), anR = P(R_ANK);
-  const hipM = { x: (hipL.x + hipR.x) / 2, y: (hipL.y + hipR.y) / 2 };
-  const shM = { x: (shL.x + shR.x) / 2, y: (shL.y + shR.y) / 2 };
+// ---------- drawing helpers for the pups ----------
+// Bold cartoon style: thick navy outlines, bright flat colors, glossy highlights.
+
+const INK = '#1b2440';
+
+function blob(c, fill, w) {
+  c.fillStyle = fill; c.fill();
+  c.strokeStyle = INK; c.lineWidth = w; c.stroke();
+}
+
+function gloss(c, x, y, rx, ry, rot = -0.5, a = 0.45) {
   c.save();
+  c.globalAlpha *= a;
+  c.fillStyle = '#fff';
+  c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+
+function tube(c, a, b, color, w, ow) {
   c.lineCap = 'round';
-  c.lineJoin = 'round';
+  c.strokeStyle = INK; c.lineWidth = w + ow * 2;
+  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+  c.strokeStyle = color; c.lineWidth = w;
+  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+}
 
-  // Wagging tail, peeking out beside the hips
-  const wag = Math.sin(time * 12) * 0.35;
-  const tailBase = { x: hipM.x + 0.12 * u, y: hipM.y - 0.05 * u };
-  const tailTip = { x: tailBase.x + Math.cos(-0.9 + wag) * 0.55 * u, y: tailBase.y + Math.sin(-0.9 + wag) * 0.55 * u };
-  limb(c, tailBase, tailTip, k.fur, 0.16 * u, ol);
-  c.beginPath(); c.arc(tailTip.x, tailTip.y, 0.08 * u, 0, Math.PI * 2); c.fillStyle = k.light; c.fill();
-
-  // Legs
-  for (const [h, kn, an] of [[hipL, knL, anL], [hipR, knR, anR]]) {
-    limb(c, h, kn, k.fur, 0.26 * u, ol);
-    limb(c, kn, an, k.fur, 0.22 * u, ol);
-    paw(c, { x: an.x, y: an.y + 0.02 * u }, 0.16 * u, k.light, ol);
-  }
-
-  // Body: rescue coat (fire) or vest (police)
-  const pad = 0.12 * u;
-  const torso = [
-    { x: shL.x + (shL.x < shR.x ? -pad : pad), y: shL.y },
-    { x: shR.x + (shR.x < shL.x ? -pad : pad), y: shR.y },
-    { x: hipR.x + (hipR.x < hipL.x ? -pad : pad), y: hipR.y + 0.08 * u },
-    { x: hipL.x + (hipL.x < hipR.x ? -pad : pad), y: hipL.y + 0.08 * u },
-  ];
-  c.beginPath();
-  torso.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)));
-  c.closePath();
-  c.lineWidth = 0.22 * u + 4; c.strokeStyle = ol; c.stroke();
-  c.lineWidth = 0.22 * u; c.strokeStyle = k.coat; c.stroke();
-  c.fillStyle = k.coat; c.fill();
-  c.save();
-  c.clip();
-  const lerp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+/** Back of the head with ears and hat; origin = head center. */
+function drawHeadBack(c, k, kind, R, u, ow, flap) {
   if (kind === 'fire') {
-    // two reflective stripes and a zip
-    for (const t of [0.55, 0.8]) {
-      const a = lerp(shL, hipL, t), b = lerp(shR, hipR, t);
-      c.strokeStyle = k.trim; c.lineWidth = 0.1 * u;
-      c.beginPath(); c.moveTo(a.x - u, a.y); c.lineTo(b.x + u, b.y); c.stroke();
+    for (const s of [-1, 1]) { // upright corgi ears
+      c.beginPath();
+      c.moveTo(s * R * 0.2, -R * 0.7);
+      c.quadraticCurveTo(s * R * 0.55, -R * 1.65, s * R * 0.98, -R * 1.42);
+      c.quadraticCurveTo(s * R * 1.12, -R * 0.9, s * R * 0.95, -R * 0.3);
+      c.closePath();
+      blob(c, k.ear, ow);
     }
-    c.strokeStyle = k.coatDark; c.lineWidth = Math.max(1.5, 0.03 * u);
-    c.beginPath(); c.moveTo(shM.x, shM.y); c.lineTo(hipM.x, hipM.y); c.stroke();
+  }
+  c.beginPath(); c.ellipse(0, 0, R * 1.04, R * 0.98, 0, 0, Math.PI * 2);
+  blob(c, k.fur, ow);
+  gloss(c, -R * 0.45, -R * 0.35, R * 0.18, R * 0.32, 0.5, 0.3);
+  if (kind === 'police') {
+    for (const s of [-1, 1]) { // floppy beagle ears
+      c.save();
+      c.translate(s * R * 0.88, -R * 0.35);
+      c.rotate(s * (-0.2 - flap * 0.3));
+      c.beginPath(); c.ellipse(s * R * 0.08, R * 0.55, R * 0.3, R * 0.68, 0, 0, Math.PI * 2);
+      blob(c, k.ear, ow);
+      c.restore();
+    }
+  }
+  if (kind === 'fire') {
+    c.beginPath(); c.ellipse(0, -R * 0.5, R * 0.84, R * 0.64, 0, Math.PI, 0); c.closePath();
+    blob(c, '#e63946', ow);
+    c.strokeStyle = '#ffd43b'; c.lineWidth = 0.15 * R;
+    c.beginPath(); c.moveTo(0, -R * 1.12); c.lineTo(0, -R * 0.55); c.stroke();
+    c.beginPath();
+    c.moveTo(-R * 1.05, -R * 0.52);
+    c.quadraticCurveTo(0, -R * 0.3, R * 1.05, -R * 0.52);
+    c.quadraticCurveTo(R * 0.8, -R * 0.05, 0, -R * 0.02);
+    c.quadraticCurveTo(-R * 0.8, -R * 0.05, -R * 1.05, -R * 0.52);
+    blob(c, '#c1121f', ow);
+    gloss(c, -R * 0.4, -R * 0.85, R * 0.2, R * 0.1, -0.4, 0.5);
   } else {
-    // vest pockets + a gold star badge
-    const chest = lerp(shM, hipM, 0.3);
-    star(c, chest.x + (shR.x - shL.x) * 0.22, chest.y, 0.13 * u, k.trim, '#b8860b');
-    const belt = lerp(shM, hipM, 0.85);
-    c.fillStyle = k.coatDark;
-    c.fillRect(belt.x - u, belt.y - 0.05 * u, 2 * u, 0.1 * u);
+    c.beginPath();
+    c.moveTo(-R * 0.66, -R * 0.58); c.lineTo(-R * 0.82, -R * 1.1);
+    c.quadraticCurveTo(0, -R * 1.42, R * 0.82, -R * 1.1); c.lineTo(R * 0.66, -R * 0.58);
+    c.closePath();
+    blob(c, '#1f3d8a', ow);
+    c.beginPath(); c.rect(-R * 0.68, -R * 0.72, R * 1.36, R * 0.17);
+    blob(c, '#14275a', ow * 0.7);
+    gloss(c, -R * 0.35, -R * 1.05, R * 0.2, R * 0.08, -0.2, 0.4);
+  }
+}
+
+/** Coat (fire) or vest (police) details, clipped to the current path. */
+function coatDetails(c, kind, k, u, ow, top, bottom) {
+  c.save(); c.clip();
+  if (kind === 'fire') {
+    for (const t of [0.45, 0.75]) {
+      const yy = top + (bottom - top) * t;
+      c.fillStyle = k.trim; c.fillRect(-2 * u, yy - 0.035 * u, 4 * u, 0.07 * u);
+      c.strokeStyle = INK; c.lineWidth = ow * 0.4; c.strokeRect(-2 * u, yy - 0.035 * u, 4 * u, 0.07 * u);
+    }
+  } else {
+    c.fillStyle = k.trim; c.fillRect(-2 * u, bottom - 0.08 * u, 4 * u, 0.05 * u);
   }
   c.restore();
-  // Collar with a round tag
-  c.strokeStyle = k.collar; c.lineWidth = 0.09 * u;
-  c.beginPath(); c.moveTo(shL.x, shM.y - 0.04 * u); c.quadraticCurveTo(shM.x, shM.y + 0.1 * u, shR.x, shM.y - 0.04 * u); c.stroke();
-  c.beginPath(); c.arc(shM.x, shM.y + 0.1 * u, 0.07 * u, 0, Math.PI * 2);
-  c.fillStyle = '#ffd43b'; c.fill(); c.strokeStyle = '#b8860b'; c.lineWidth = 1.5; c.stroke();
+}
 
-  // Arms: coat sleeves, furry forearms, paws
-  for (const [s, e, w] of [[shL, elL, wrL], [shR, elR, wrR]]) {
-    limb(c, s, e, k.coat, 0.2 * u, ol);
-    limb(c, e, w, k.fur, 0.17 * u, ol);
-    paw(c, w, 0.12 * u, k.light, ol);
+/**
+ * A pup sitting and facing you (menu previews).
+ * (x, y) = ground point under the pup, u = pixels per unit (pup ~1.75 units tall).
+ */
+function drawDogFront(c, x, y, u, kind, time = 0) {
+  const k = PUPS[kind] || PUPS.fire;
+  const ow = Math.max(2, 0.045 * u), ol = INK;
+  c.save();
+  c.translate(x, y);
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  // Tail wagging out from behind
+  const wag = Math.sin(time * 9) * 0.35;
+  const tb = { x: 0.3 * u, y: -0.2 * u }, tt = { x: tb.x + Math.cos(-0.7 + wag) * 0.45 * u, y: tb.y + Math.sin(-0.7 + wag) * 0.45 * u };
+  tube(c, tb, tt, k.fur, 0.14 * u, ow);
+  c.beginPath(); c.arc(tt.x, tt.y, 0.08 * u, 0, Math.PI * 2); blob(c, k.light, ow * 0.8);
+  // Haunches and back paws
+  for (const s of [-1, 1]) {
+    c.beginPath(); c.ellipse(s * 0.3 * u, -0.26 * u, 0.24 * u, 0.25 * u, 0, 0, Math.PI * 2); blob(c, k.fur, ow);
+    c.beginPath(); c.ellipse(s * 0.4 * u, -0.06 * u, 0.15 * u, 0.08 * u, 0, 0, Math.PI * 2); blob(c, k.light, ow);
   }
-
+  // Chest in the coat / vest
+  c.beginPath(); c.ellipse(0, -0.55 * u, 0.33 * u, 0.42 * u, 0, 0, Math.PI * 2);
+  blob(c, k.coat, ow);
+  c.beginPath(); c.ellipse(0, -0.55 * u, 0.33 * u, 0.42 * u, 0, 0, Math.PI * 2);
+  coatDetails(c, kind, k, u, ow, -0.97 * u, -0.13 * u);
+  if (kind === 'police') star(c, 0.12 * u, -0.7 * u, 0.09 * u, k.trim, '#b8860b');
+  gloss(c, -0.15 * u, -0.75 * u, 0.05 * u, 0.12 * u, 0.3, 0.35);
+  // Front legs
+  for (const s of [-1, 1]) {
+    tube(c, { x: s * 0.15 * u, y: -0.5 * u }, { x: s * 0.16 * u, y: -0.1 * u }, k.fur, 0.17 * u, ow);
+    c.beginPath(); c.ellipse(s * 0.17 * u, -0.07 * u, 0.13 * u, 0.08 * u, 0, 0, Math.PI * 2); blob(c, k.light, ow);
+  }
+  // Collar + tag
+  c.beginPath(); c.ellipse(0, -0.93 * u, 0.24 * u, 0.07 * u, 0, 0, Math.PI * 2); blob(c, k.collar, ow * 0.8);
+  c.beginPath(); c.arc(0, -0.85 * u, 0.06 * u, 0, Math.PI * 2); blob(c, '#ffd43b', ow * 0.5);
   // Head
-  const nose = P(NOSE), eL = P(EYE_L), eR = P(EYE_R);
-  let ang = Math.atan2(eR.y - eL.y, eR.x - eL.x);
-  if (ang > Math.PI / 2) ang -= Math.PI;
-  if (ang < -Math.PI / 2) ang += Math.PI;
-  ang = Math.max(-0.5, Math.min(0.5, ang));
-  const R = 0.42 * u;
-  // Keep the head sitting on the shoulders even if the nose point jitters.
-  const hx = nose.x, hy = Math.min(nose.y - 0.05 * u, shM.y - R * 0.95);
-  c.translate(hx, hy);
-  c.rotate(ang);
+  const R = 0.46 * u;
+  c.translate(0, -1.27 * u);
+  c.rotate(Math.sin(time * 1.6) * 0.08);
+  drawFace(c, k, kind, R, u, time, ol);
+  c.restore();
+}
 
+/** Face, ears and hat seen from the front; origin = head center. */
+function drawFace(c, k, kind, R, u, time, ol) {
   if (kind === 'fire') {
     // big upright corgi ears (behind the head)
     for (const s of [-1, 1]) {
@@ -1026,202 +1033,91 @@ export function drawPup(c, P, u, kind, time = 0, highlight = null) {
     outlined('#111', ol, Math.max(1, 0.025 * u), c);
     star(c, 0, -R * 0.98, R * 0.17, '#ffd43b', '#b8860b');
   }
-  c.restore();
-
-  if (highlight) {
-    // glow ring while ducking etc.
-    c.save();
-    c.strokeStyle = highlight; c.lineWidth = 4; c.globalAlpha = 0.8;
-    c.beginPath(); c.ellipse(hipM.x, anL.y + 0.05 * u, 0.7 * u, 0.15 * u, 0, 0, Math.PI * 2); c.stroke();
-    c.restore();
-  }
-}
-
-// ---------- in-game pup: seen from behind, running down the road ----------
-// Bold cartoon style: thick navy outlines, bright flat colors, glossy highlights,
-// big head. The run cycle is animated; your body steers it (lane, lean, duck).
-
-const INK = '#1b2440';
-
-function blob(c, fill, w) {
-  c.fillStyle = fill; c.fill();
-  c.strokeStyle = INK; c.lineWidth = w; c.stroke();
-}
-
-function gloss(c, x, y, rx, ry, rot = -0.5, a = 0.45) {
-  c.save();
-  c.globalAlpha *= a;
-  c.fillStyle = '#fff';
-  c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); c.fill();
-  c.restore();
-}
-
-function tube(c, a, b, color, w, ow) {
-  c.lineCap = 'round';
-  c.strokeStyle = INK; c.lineWidth = w + ow * 2;
-  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
-  c.strokeStyle = color; c.lineWidth = w;
-  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
 }
 
 /**
- * @param c       2D context
- * @param x, y    screen point between the feet on the ground
- * @param u       pixels per world unit (pup ~1.9 units tall)
- * @param kind    'fire' | 'police'
- * @param o       { run: 0..1 running amount, phase: run-cycle phase (radians),
- *                  crouch: 0..1, lean: radians, time: seconds }
+ * A pup galloping away from you down the road, seen from behind.
+ * @param o { run: 0..1, phase: gallop phase (radians), crouch: 0..1, lean: radians, time: seconds }
  */
-function drawPupBack(c, x, y, u, kind, o) {
+function drawDogBack(c, x, y, u, kind, o) {
   const k = PUPS[kind] || PUPS.fire;
-  const ow = Math.max(2, 0.045 * u); // outline width
-  const run = o.run, ph = o.phase, cr = o.crouch;
-  const bob = run * Math.abs(Math.sin(ph)) * 0.08 * u;
-  const drop = cr * 0.42 * u;
+  const ow = Math.max(2, 0.04 * u);
+  const run = o.run, ph = o.phase;
+  const sy = 1 - 0.3 * o.crouch;                       // ducking: low and flat
+  const bob = run * Math.abs(Math.sin(ph)) * 0.07 * u; // whole body bounces with the gallop
+  const Y = (v) => v * u * sy - bob;
   c.save();
   c.translate(x, y);
   c.rotate(o.lean);
-  c.lineJoin = 'round';
-  c.lineCap = 'round';
+  c.lineJoin = 'round'; c.lineCap = 'round';
 
-  const hipY = -0.82 * u + drop * 0.55 - bob;
-  const shY = -1.26 * u + drop - bob;
-  const headY = -1.72 * u + drop * 1.05 - bob;
-  const R = 0.5 * u;
-
-  // Legs: the lifted leg kicks back, so we see its paw pad.
-  const legs = [];
+  // Front legs (further away, so higher up and partly hidden)
   for (const s of [-1, 1]) {
-    const p = ph + (s > 0 ? Math.PI : 0);
-    const lift = run * Math.max(0, Math.sin(p));
-    legs.push({ s, lift, hip: { x: s * 0.16 * u, y: hipY }, paw: { x: s * (0.2 - lift * 0.05) * u, y: -0.08 * u - lift * 0.42 * u - cr * 0.05 * u } });
+    const reach = run * Math.max(0, Math.sin(ph + 1.6 + (s > 0 ? 0.5 : 0)));
+    const pawY = -0.2 * u - reach * 0.16 * u;
+    tube(c, { x: s * 0.13 * u, y: Y(-0.55) }, { x: s * 0.14 * u, y: pawY }, k.fur, 0.12 * u, ow);
+    c.beginPath(); c.ellipse(s * 0.14 * u, pawY, 0.09 * u, 0.06 * u, 0, 0, Math.PI * 2); blob(c, k.light, ow);
   }
-  legs.sort((a, b) => b.lift - a.lift); // lifted leg first (it's further away)
-  for (const L of legs) {
-    const knee = { x: L.s * (0.22 + cr * 0.12) * u, y: (L.hip.y + L.paw.y) / 2 + L.lift * 0.05 * u };
-    tube(c, L.hip, knee, k.fur, 0.3 * u, ow);
-    tube(c, knee, L.paw, k.fur, 0.26 * u, ow);
-    // paw: the sole faces us when the leg is kicked back
+
+  // Head (beyond the shoulders), bobbing a little against the body
+  c.save();
+  c.translate(0, Y(-1.0) + bob * 0.6);
+  drawHeadBack(c, k, kind, 0.36 * u, u, ow, run * Math.abs(Math.sin(ph)));
+  c.restore();
+
+  // Shoulders and back, in the coat / vest
+  const back = () => {
     c.beginPath();
-    c.ellipse(L.paw.x, L.paw.y, 0.17 * u, 0.12 * u + L.lift * 0.05 * u, 0, 0, Math.PI * 2);
-    blob(c, k.light, ow);
-    if (L.lift > 0.25) {
+    c.moveTo(-0.27 * u, Y(-0.74));
+    c.quadraticCurveTo(0, Y(-0.9), 0.27 * u, Y(-0.74));
+    c.quadraticCurveTo(0.38 * u, Y(-0.55), 0.3 * u, Y(-0.42));
+    c.lineTo(-0.3 * u, Y(-0.42));
+    c.quadraticCurveTo(-0.38 * u, Y(-0.55), -0.27 * u, Y(-0.74));
+    c.closePath();
+  };
+  back(); blob(c, k.coat, ow);
+  back(); coatDetails(c, kind, k, u, ow, Y(-0.88), Y(-0.45));
+  // Collar where the neck meets the coat
+  c.beginPath(); c.ellipse(0, Y(-0.82), 0.2 * u, 0.06 * u, 0, 0, Math.PI * 2); blob(c, k.collar, ow * 0.8);
+  // Rescue backpack on the back
+  const bw = 0.32 * u, bh = 0.2 * u * sy, by = Y(-0.74);
+  c.beginPath(); c.roundRect(-bw / 2, by, bw, bh, 0.06 * u);
+  blob(c, kind === 'fire' ? '#e63946' : '#24489e', ow);
+  if (kind === 'fire') {
+    c.fillStyle = '#ffd43b'; c.beginPath(); c.arc(0, by + bh / 2, 0.05 * u, 0, Math.PI * 2); c.fill();
+  } else {
+    star(c, 0, by + bh / 2, 0.06 * u, '#ffd43b', '#b8860b');
+  }
+  gloss(c, -bw * 0.28, by + bh * 0.3, 0.03 * u, 0.06 * u, 0.2);
+
+  // Hind legs: a gallop kicks both back legs up, showing the paw pads
+  for (const s of [-1, 1]) {
+    const kick = run * Math.max(0, Math.sin(ph + (s > 0 ? 0.45 : 0)));
+    const thigh = { x: s * 0.24 * u, y: Y(-0.38) };
+    const paw = { x: s * (0.25 - kick * 0.04) * u, y: -0.06 * u - kick * 0.38 * u - bob * 0.3 };
+    c.beginPath(); c.ellipse(thigh.x, thigh.y, 0.16 * u, 0.2 * u * sy, s * 0.15, 0, Math.PI * 2); blob(c, k.fur, ow);
+    tube(c, { x: thigh.x, y: thigh.y + 0.08 * u }, paw, k.fur, 0.15 * u, ow);
+    c.beginPath(); c.ellipse(paw.x, paw.y, 0.13 * u, 0.09 * u + kick * 0.04 * u, 0, 0, Math.PI * 2); blob(c, k.light, ow);
+    if (kick > 0.25) {
       c.fillStyle = '#ff9db0';
-      c.beginPath(); c.ellipse(L.paw.x, L.paw.y + 0.03 * u, 0.07 * u, 0.055 * u, 0, 0, Math.PI * 2); c.fill();
-      for (const dx of [-0.09, 0, 0.09]) {
-        c.beginPath(); c.arc(L.paw.x + dx * u, L.paw.y - 0.07 * u, 0.03 * u, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.ellipse(paw.x, paw.y + 0.02 * u, 0.055 * u, 0.045 * u, 0, 0, Math.PI * 2); c.fill();
+      for (const dx of [-0.07, 0, 0.07]) {
+        c.beginPath(); c.arc(paw.x + dx * u, paw.y - 0.055 * u, 0.024 * u, 0, Math.PI * 2); c.fill();
       }
     }
   }
+  // Rump between the hind legs
+  c.beginPath(); c.ellipse(0, Y(-0.46), 0.3 * u, 0.24 * u * sy, 0, 0, Math.PI * 2); blob(c, k.fur, ow);
+  c.fillStyle = k.light; // fluffy light patch under the tail
+  c.beginPath(); c.ellipse(0, Y(-0.4), 0.13 * u, 0.1 * u * sy, 0, 0, Math.PI * 2); c.fill();
+  gloss(c, -0.12 * u, Y(-0.58), 0.05 * u, 0.09 * u, 0.4, 0.3);
 
-  // Tail, wagging up from the back of the hips
-  const wag = Math.sin((o.time || 0) * 14) * 0.45;
-  const tb = { x: 0, y: hipY - 0.02 * u };
-  const tt = { x: Math.sin(wag) * 0.32 * u, y: tb.y - 0.36 * u };
-  tube(c, tb, tt, k.fur, 0.16 * u, ow);
-  c.beginPath(); c.arc(tt.x, tt.y, 0.09 * u, 0, Math.PI * 2); blob(c, k.light, ow * 0.8);
-
-  // Arms swing forward/back: the back-swinging arm shows its paw beside the body.
-  for (const s of [-1, 1]) {
-    const p = ph + (s > 0 ? 0 : Math.PI);
-    const sw = run * Math.sin(p);
-    const sh = { x: s * 0.3 * u, y: shY + 0.08 * u };
-    const el = { x: s * (0.42 + cr * 0.05) * u, y: shY + 0.3 * u };
-    const hd = { x: s * (0.44 - sw * 0.06) * u, y: shY + (0.42 + sw * 0.16) * u };
-    tube(c, sh, el, k.coat, 0.22 * u, ow);
-    tube(c, el, hd, k.fur, 0.18 * u, ow);
-    c.beginPath(); c.arc(hd.x, hd.y, 0.11 * u, 0, Math.PI * 2); blob(c, k.light, ow);
-  }
-
-  // Body (coat / vest from behind)
-  c.beginPath();
-  c.moveTo(-0.3 * u, shY);
-  c.quadraticCurveTo(0, shY - 0.07 * u, 0.3 * u, shY);
-  c.quadraticCurveTo(0.36 * u, (shY + hipY) / 2, 0.27 * u, hipY + 0.08 * u);
-  c.quadraticCurveTo(0, hipY + 0.16 * u, -0.27 * u, hipY + 0.08 * u);
-  c.quadraticCurveTo(-0.36 * u, (shY + hipY) / 2, -0.3 * u, shY);
-  c.closePath();
-  blob(c, k.coat, ow);
-  c.save(); c.clip();
-  if (kind === 'fire') {
-    for (const t of [0.62, 0.84]) {
-      const yy = shY + (hipY - shY) * t;
-      c.fillStyle = k.trim; c.fillRect(-u, yy - 0.045 * u, 2 * u, 0.09 * u);
-      c.strokeStyle = INK; c.lineWidth = ow * 0.5; c.strokeRect(-u, yy - 0.045 * u, 2 * u, 0.09 * u);
-    }
-  } else {
-    c.fillStyle = k.coatDark; c.fillRect(-u, hipY - 0.04 * u, 2 * u, 0.12 * u);
-  }
-  c.restore();
-
-  // Rescue backpack
-  const bpY = shY + 0.08 * u, bpH = 0.42 * u, bpW = 0.4 * u;
-  c.beginPath(); c.roundRect(-bpW / 2, bpY, bpW, bpH, 0.1 * u);
-  blob(c, kind === 'fire' ? '#e63946' : '#24489e', ow);
-  c.beginPath(); c.roundRect(-bpW * 0.36, bpY + bpH * 0.5, bpW * 0.72, bpH * 0.38, 0.06 * u);
-  blob(c, kind === 'fire' ? '#c1121f' : '#1a3577', ow * 0.7);
-  if (kind === 'fire') {
-    // a little water-hose nozzle
-    c.beginPath(); c.roundRect(bpW * 0.32, bpY + 0.04 * u, 0.1 * u, 0.3 * u, 0.04 * u); blob(c, '#c9d1d9', ow * 0.6);
-    c.fillStyle = '#ffd43b';
-    c.beginPath(); c.arc(0, bpY + bpH * 0.3, 0.07 * u, 0, Math.PI * 2); c.fill();
-  } else {
-    star(c, 0, bpY + bpH * 0.3, 0.09 * u, '#ffd43b', '#b8860b');
-  }
-  gloss(c, -bpW * 0.25, bpY + bpH * 0.2, 0.05 * u, 0.1 * u, 0.2);
-
-  // Collar
-  c.beginPath(); c.ellipse(0, shY - 0.02 * u, 0.24 * u, 0.07 * u, 0, 0, Math.PI * 2);
-  blob(c, k.collar, ow * 0.8);
-
-  // Head from behind
-  if (kind === 'fire') {
-    for (const s of [-1, 1]) { // upright corgi ears
-      c.beginPath();
-      c.moveTo(s * R * 0.2, headY - R * 0.7);
-      c.quadraticCurveTo(s * R * 0.55, headY - R * 1.65, s * R * 0.98, headY - R * 1.42);
-      c.quadraticCurveTo(s * R * 1.12, headY - R * 0.9, s * R * 0.95, headY - R * 0.3);
-      c.closePath();
-      blob(c, k.ear, ow);
-    }
-  }
-  c.beginPath(); c.ellipse(0, headY, R * 1.04, R * 0.98, 0, 0, Math.PI * 2);
-  blob(c, k.fur, ow);
-  gloss(c, -R * 0.45, headY - R * 0.35, R * 0.18, R * 0.32, 0.5, 0.3);
-  if (kind === 'police') {
-    for (const s of [-1, 1]) { // floppy beagle ears, flapping as he runs
-      c.save();
-      c.translate(s * R * 0.88, headY - R * 0.35);
-      c.rotate(s * (-0.2 - run * 0.25 * Math.abs(Math.sin(ph))));
-      c.beginPath(); c.ellipse(s * R * 0.08, R * 0.55, R * 0.3, R * 0.68, 0, 0, Math.PI * 2);
-      blob(c, k.ear, ow);
-      c.restore();
-    }
-  }
-  // Hats (back view)
-  if (kind === 'fire') {
-    c.beginPath(); c.ellipse(0, headY - R * 0.5, R * 0.84, R * 0.64, 0, Math.PI, 0); c.closePath();
-    blob(c, '#e63946', ow);
-    c.strokeStyle = '#ffd43b'; c.lineWidth = 0.06 * u;
-    c.beginPath(); c.moveTo(0, headY - R * 1.12); c.lineTo(0, headY - R * 0.55); c.stroke();
-    // long back brim of a firefighter helmet
-    c.beginPath();
-    c.moveTo(-R * 1.05, headY - R * 0.52);
-    c.quadraticCurveTo(0, headY - R * 0.3, R * 1.05, headY - R * 0.52);
-    c.quadraticCurveTo(R * 0.8, headY - R * 0.05, 0, headY - R * 0.02);
-    c.quadraticCurveTo(-R * 0.8, headY - R * 0.05, -R * 1.05, headY - R * 0.52);
-    blob(c, '#c1121f', ow);
-    gloss(c, -R * 0.4, headY - R * 0.85, R * 0.2, R * 0.1, -0.4, 0.5);
-  } else {
-    c.beginPath();
-    c.moveTo(-R * 0.66, headY - R * 0.58); c.lineTo(-R * 0.82, headY - R * 1.1);
-    c.quadraticCurveTo(0, headY - R * 1.42, R * 0.82, headY - R * 1.1); c.lineTo(R * 0.66, headY - R * 0.58);
-    c.closePath();
-    blob(c, '#1f3d8a', ow);
-    c.beginPath(); c.rect(-R * 0.68, headY - R * 0.72, R * 1.36, R * 0.17);
-    blob(c, '#14275a', ow * 0.7);
-    gloss(c, -R * 0.35, headY - R * 1.05, R * 0.2, R * 0.08, -0.2, 0.4);
-  }
+  // Tail, wagging up from the top of the rump
+  const wag = Math.sin((o.time || 0) * 13) * 0.5;
+  const tb = { x: 0.05 * u, y: Y(-0.6) };
+  const tt = { x: tb.x + (0.16 + Math.sin(wag) * 0.12) * u, y: tb.y - 0.17 * u * sy };
+  tube(c, tb, tt, k.fur, 0.1 * u, ow);
+  c.beginPath(); c.arc(tt.x, tt.y, 0.065 * u, 0, Math.PI * 2); blob(c, k.light, ow * 0.8);
   c.restore();
 }
 
@@ -1246,13 +1142,13 @@ function drawPlayer() {
   // Shadow
   ctx.fillStyle = 'rgba(30, 60, 20, 0.3)';
   ctx.beginPath();
-  ctx.ellipse(ground.x, ground.y, u * 0.6, u * 0.13, 0, 0, Math.PI * 2);
+  ctx.ellipse(ground.x, ground.y - u * 0.12, u * 0.62, u * 0.2, 0, 0, Math.PI * 2);
   ctx.fill();
   if (ducking) {
     ctx.strokeStyle = COLORS.ok; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.ellipse(ground.x, ground.y, u * 0.7, u * 0.16, 0, 0, Math.PI * 2); ctx.stroke();
   }
-  drawPupBack(ctx, ground.x, ground.y, u, pupKind, {
+  drawDogBack(ctx, ground.x, ground.y, u * 1.35, pupKind, {
     run: running, phase: runPhase, crouch: crouchVis, lean: leanVis, time: now,
   });
 }
