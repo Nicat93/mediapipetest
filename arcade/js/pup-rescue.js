@@ -1142,6 +1142,8 @@ function drawDogBack(c, x, y, u, kind, o) {
   c.restore();
 }
 
+const PUP_SCALE = 0.85; // size of the in-game pup (1 = about 1.4 lane-widths tall)
+
 let runPhase = 0, leanVis = 0, crouchVis = 0, prevLaneVis = 0, lastDraw = 0;
 
 function drawPlayer() {
@@ -1163,13 +1165,13 @@ function drawPlayer() {
   // Shadow
   ctx.fillStyle = 'rgba(30, 60, 20, 0.3)';
   ctx.beginPath();
-  ctx.ellipse(ground.x, ground.y - u * 0.12, u * 0.62, u * 0.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(ground.x, ground.y - u * 0.09 * PUP_SCALE, u * 0.46 * PUP_SCALE, u * 0.15 * PUP_SCALE, 0, 0, Math.PI * 2);
   ctx.fill();
   if (ducking) {
     ctx.strokeStyle = COLORS.ok; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.ellipse(ground.x, ground.y, u * 0.7, u * 0.16, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(ground.x, ground.y - u * 0.09 * PUP_SCALE, u * 0.55 * PUP_SCALE, u * 0.18 * PUP_SCALE, 0, 0, Math.PI * 2); ctx.stroke();
   }
-  drawDogBack(ctx, ground.x, ground.y, u * 1.35, pupKind, {
+  drawDogBack(ctx, ground.x, ground.y, u * PUP_SCALE, pupKind, {
     run: running, phase: runPhase, crouch: crouchVis, lean: leanVis, time: now,
   });
 }
