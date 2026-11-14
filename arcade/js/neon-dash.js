@@ -4,7 +4,7 @@
 import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs';
 import { createCamera } from './camera.js';
 import { livesPicker, heartsText } from './lives.js';
-import { sfx, unlock, startMusic, stopMusic, soundButton } from './sound.js';
+import { sfx, unlock, startAmbience, stopAmbience, soundButton } from './sound.js';
 
 const WASM_PATH = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm';
 const MODEL_URL =
@@ -162,7 +162,7 @@ function newGame() {
 
 function gameOver() {
   setState('over');
-  stopMusic();
+  stopAmbience();
   sfx.over();
   let best = score;
   try { best = Math.max(score, Number(localStorage.getItem(BEST_KEY)) || 0); localStorage.setItem(BEST_KEY, best); } catch {}
@@ -317,7 +317,7 @@ function update(dt) {
   if (state === 'countdown') {
     const n = Math.floor(stateTime);
     if (n !== lastTick && n < 3) { lastTick = n; sfx.tick(); }
-    if (stateTime >= 3) { setState('play'); speed = 14; nextRowIn = 10; sfx.go(); startMusic('neon'); }
+    if (stateTime >= 3) { setState('play'); speed = 14; nextRowIn = 10; sfx.go(); startAmbience('neon'); }
     return;
   }
   if (state !== 'play') return;

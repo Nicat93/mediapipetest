@@ -1,10 +1,10 @@
-// Sound for the arcade games: little synthesized effects and a looping
-// background tune, all made with the Web Audio API (no audio files).
+// Sound for the arcade games: little synthesized effects and quiet ambience
+// (no music), all made with the Web Audio API (no audio files).
 // Browsers only allow sound after a tap/click, so call unlock() from one.
 
 const KEY = 'arcade.sound'; // '0' = muted, shared by the games
 
-let ac = null, master = null, musicBus = null;
+let ac = null, master = null;
 let muted = false;
 try { muted = localStorage.getItem(KEY) === '0'; } catch {}
 
@@ -16,9 +16,6 @@ function ctx() {
     master = ac.createGain();
     master.gain.value = muted ? 0 : 0.8;
     master.connect(ac.destination);
-    musicBus = ac.createGain();
-    musicBus.gain.value = 0.32;
-    musicBus.connect(master);
   }
   return ac;
 }
@@ -122,63 +119,75 @@ export const sfx = {
   },
 };
 
-// ---- background music: a simple step sequencer ----
-// Songs are original little loops: 16 steps per bar, notes as MIDI numbers (0 = rest).
-export const SONGS = {
-  // Bouncy, sunny tune for Pup Rescue Run (C major).
-  pups: {
-    bpm: 128, lead: 'square', bass: 'triangle',
-    melody: [
-      72, 0, 76, 0, 79, 0, 76, 0, 77, 0, 81, 0, 79, 0, 0, 0,
-      76, 0, 79, 0, 84, 0, 79, 0, 81, 79, 77, 0, 76, 0, 0, 0,
-      72, 0, 76, 0, 79, 0, 76, 0, 77, 0, 81, 0, 84, 0, 0, 0,
-      83, 0, 81, 0, 79, 0, 77, 0, 76, 0, 74, 0, 72, 0, 0, 0,
-    ],
-    bassline: [48, 55, 52, 55, 53, 57, 55, 59, 48, 55, 52, 55, 53, 55, 48, 43],
-  },
-  // Driving synthwave loop for Neon Dash (A minor).
-  neon: {
-    bpm: 118, lead: 'sawtooth', bass: 'sawtooth',
-    melody: [
-      69, 0, 0, 72, 0, 0, 76, 0, 74, 0, 72, 0, 71, 0, 0, 0,
-      69, 0, 0, 72, 0, 0, 76, 0, 79, 0, 77, 0, 76, 0, 0, 0,
-      77, 0, 0, 76, 0, 0, 74, 0, 72, 0, 74, 0, 76, 0, 0, 0,
-      74, 0, 0, 72, 0, 0, 71, 0, 72, 0, 71, 0, 69, 0, 0, 0,
-    ],
-    bassline: [45, 45, 45, 45, 41, 41, 41, 41, 48, 48, 48, 48, 43, 43, 43, 43],
-  },
-};
+// ---- ambience: quiet background sounds of the place (no music) ----
+// 'town': birds chirping now and then. 'neon': soft wind with a low hum.
 
-let seq = null;
+let amb = null;
 
-export function startMusic(name) {
-  const c = ctx();
-  if (!c) return;
-  stopMusic();
-  const song = SONGS[name];
-  const stepDur = 60 / song.bpm / 4; // 16th notes
-  const s = { song, step: 0, next: c.currentTime + 0.1, timer: 0 };
-  const schedule = () => {
-    while (s.next < c.currentTime + 0.25) {
-      const i = s.step;
-      const n = song.melody[i % song.melody.length];
-      if (n) tone(midi(n), stepDur * 1.8, { type: song.lead, vol: 0.09, at: s.next, out: musicBus });
-      if (i % 4 === 0) {
-        const b = song.bassline[Math.floor(i / 4) % song.bassline.length];
-        tone(midi(b), stepDur * 3.2, { type: song.bass, vol: 0.16, at: s.next, out: musicBus });
-        if (i % 8 === 0) tone(90, 0.12, { type: 'sine', vol: 0.35, slide: -50, at: s.next, out: musicBus }); // kick
-      }
-      if (i % 2 === 1) noise(0.04, { vol: 0.05, at: s.next, out: musicBus }); // hi-hat
-      s.next += stepDur;
-      s.step++;
-    }
-  };
-  schedule();
-  s.timer = setInterval(schedule, 60);
-  seq = s;
+function chirp(at) {
+  // a little bird: 2–4 quick rising whistles
+  const base = 2600 + Math.random() * 1400;
+  const n = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) {
+    tone(base * (1 + Math.random() * 0.1), 0.07, { type: 'sine', vol: 0.05, slide: 900, at: at + i * 0.11, out: ambBus });
+  }
 }
 
-export function stopMusic() {
-  if (seq) clearInterval(seq.timer);
-  seq = null;
+let ambBus = null;
+
+export function startAmbience(name) {
+  const c = ctx();
+  if (!c) return;
+  stopAmbience();
+  ambBus = c.createGain();
+  ambBus.gain.value = 0.9;
+  ambBus.connect(master);
+  const a = { timers: [], nodes: [] };
+  if (name === 'town') {
+    const next = () => {
+      chirp(c.currentTime + 0.05);
+      a.timers.push(setTimeout(next, 1500 + Math.random() * 3500));
+    };
+    a.timers.push(setTimeout(next, 800));
+  } else {
+    // wind: looping filtered noise, slowly swelling
+    noise(0.01, { vol: 0.0001, out: ambBus }); // makes sure the noise buffer exists
+    const src = c.createBufferSource();
+    src.buffer = noiseBuf;
+    src.loop = true;
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 500;
+    const g = c.createGain();
+    g.gain.value = 0.05;
+    const lfo = c.createOscillator();
+    const lfoGain = c.createGain();
+    lfo.frequency.value = 0.12;
+    lfoGain.gain.value = 0.025;
+    lfo.connect(lfoGain).connect(g.gain);
+    src.connect(f).connect(g).connect(ambBus);
+    // low hum
+    const hum = c.createOscillator();
+    hum.type = 'sine';
+    hum.frequency.value = 55;
+    const hg = c.createGain();
+    hg.gain.value = 0.03;
+    hum.connect(hg).connect(ambBus);
+    src.start(); lfo.start(); hum.start();
+    a.nodes.push(src, lfo, hum);
+  }
+  amb = a;
+}
+
+export function stopAmbience() {
+  if (!amb) return;
+  amb.timers.forEach(clearTimeout);
+  for (const n of amb.nodes) { try { n.stop(); } catch {} }
+  if (ambBus) {
+    const bus = ambBus;
+    bus.gain.setTargetAtTime(0.0001, ac.currentTime, 0.1);
+    setTimeout(() => bus.disconnect(), 600);
+  }
+  amb = null;
+  ambBus = null;
 }
