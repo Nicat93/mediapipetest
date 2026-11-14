@@ -843,7 +843,7 @@ function star(c, x, y, r, fill, stroke) {
  */
 export function drawPup(c, P, u, kind, time = 0, highlight = null) {
   const k = PUPS[kind] || PUPS.fire;
-  const ol = '#3b2a1e';
+  const ol = '#1b2440';
   const shL = P(L_SH), shR = P(R_SH), hipL = P(L_HIP), hipR = P(R_HIP);
   const elL = P(ELB_L), elR = P(ELB_R), wrL = P(L_WR), wrR = P(R_WR);
   const knL = P(KNEE_L), knR = P(KNEE_R), anL = P(L_ANK), anR = P(R_ANK);
@@ -1037,27 +1037,224 @@ export function drawPup(c, P, u, kind, time = 0, highlight = null) {
   }
 }
 
+// ---------- in-game pup: seen from behind, running down the road ----------
+// Bold cartoon style: thick navy outlines, bright flat colors, glossy highlights,
+// big head. The run cycle is animated; your body steers it (lane, lean, duck).
+
+const INK = '#1b2440';
+
+function blob(c, fill, w) {
+  c.fillStyle = fill; c.fill();
+  c.strokeStyle = INK; c.lineWidth = w; c.stroke();
+}
+
+function gloss(c, x, y, rx, ry, rot = -0.5, a = 0.45) {
+  c.save();
+  c.globalAlpha *= a;
+  c.fillStyle = '#fff';
+  c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+
+function tube(c, a, b, color, w, ow) {
+  c.lineCap = 'round';
+  c.strokeStyle = INK; c.lineWidth = w + ow * 2;
+  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+  c.strokeStyle = color; c.lineWidth = w;
+  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+}
+
+/**
+ * @param c       2D context
+ * @param x, y    screen point between the feet on the ground
+ * @param u       pixels per world unit (pup ~1.9 units tall)
+ * @param kind    'fire' | 'police'
+ * @param o       { run: 0..1 running amount, phase: run-cycle phase (radians),
+ *                  crouch: 0..1, lean: radians, time: seconds }
+ */
+function drawPupBack(c, x, y, u, kind, o) {
+  const k = PUPS[kind] || PUPS.fire;
+  const ow = Math.max(2, 0.045 * u); // outline width
+  const run = o.run, ph = o.phase, cr = o.crouch;
+  const bob = run * Math.abs(Math.sin(ph)) * 0.08 * u;
+  const drop = cr * 0.42 * u;
+  c.save();
+  c.translate(x, y);
+  c.rotate(o.lean);
+  c.lineJoin = 'round';
+  c.lineCap = 'round';
+
+  const hipY = -0.82 * u + drop * 0.55 - bob;
+  const shY = -1.26 * u + drop - bob;
+  const headY = -1.72 * u + drop * 1.05 - bob;
+  const R = 0.5 * u;
+
+  // Legs: the lifted leg kicks back, so we see its paw pad.
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const p = ph + (s > 0 ? Math.PI : 0);
+    const lift = run * Math.max(0, Math.sin(p));
+    legs.push({ s, lift, hip: { x: s * 0.16 * u, y: hipY }, paw: { x: s * (0.2 - lift * 0.05) * u, y: -0.08 * u - lift * 0.42 * u - cr * 0.05 * u } });
+  }
+  legs.sort((a, b) => b.lift - a.lift); // lifted leg first (it's further away)
+  for (const L of legs) {
+    const knee = { x: L.s * (0.22 + cr * 0.12) * u, y: (L.hip.y + L.paw.y) / 2 + L.lift * 0.05 * u };
+    tube(c, L.hip, knee, k.fur, 0.3 * u, ow);
+    tube(c, knee, L.paw, k.fur, 0.26 * u, ow);
+    // paw: the sole faces us when the leg is kicked back
+    c.beginPath();
+    c.ellipse(L.paw.x, L.paw.y, 0.17 * u, 0.12 * u + L.lift * 0.05 * u, 0, 0, Math.PI * 2);
+    blob(c, k.light, ow);
+    if (L.lift > 0.25) {
+      c.fillStyle = '#ff9db0';
+      c.beginPath(); c.ellipse(L.paw.x, L.paw.y + 0.03 * u, 0.07 * u, 0.055 * u, 0, 0, Math.PI * 2); c.fill();
+      for (const dx of [-0.09, 0, 0.09]) {
+        c.beginPath(); c.arc(L.paw.x + dx * u, L.paw.y - 0.07 * u, 0.03 * u, 0, Math.PI * 2); c.fill();
+      }
+    }
+  }
+
+  // Tail, wagging up from the back of the hips
+  const wag = Math.sin((o.time || 0) * 14) * 0.45;
+  const tb = { x: 0, y: hipY - 0.02 * u };
+  const tt = { x: Math.sin(wag) * 0.32 * u, y: tb.y - 0.36 * u };
+  tube(c, tb, tt, k.fur, 0.16 * u, ow);
+  c.beginPath(); c.arc(tt.x, tt.y, 0.09 * u, 0, Math.PI * 2); blob(c, k.light, ow * 0.8);
+
+  // Arms swing forward/back: the back-swinging arm shows its paw beside the body.
+  for (const s of [-1, 1]) {
+    const p = ph + (s > 0 ? 0 : Math.PI);
+    const sw = run * Math.sin(p);
+    const sh = { x: s * 0.3 * u, y: shY + 0.08 * u };
+    const el = { x: s * (0.42 + cr * 0.05) * u, y: shY + 0.3 * u };
+    const hd = { x: s * (0.44 - sw * 0.06) * u, y: shY + (0.42 + sw * 0.16) * u };
+    tube(c, sh, el, k.coat, 0.22 * u, ow);
+    tube(c, el, hd, k.fur, 0.18 * u, ow);
+    c.beginPath(); c.arc(hd.x, hd.y, 0.11 * u, 0, Math.PI * 2); blob(c, k.light, ow);
+  }
+
+  // Body (coat / vest from behind)
+  c.beginPath();
+  c.moveTo(-0.3 * u, shY);
+  c.quadraticCurveTo(0, shY - 0.07 * u, 0.3 * u, shY);
+  c.quadraticCurveTo(0.36 * u, (shY + hipY) / 2, 0.27 * u, hipY + 0.08 * u);
+  c.quadraticCurveTo(0, hipY + 0.16 * u, -0.27 * u, hipY + 0.08 * u);
+  c.quadraticCurveTo(-0.36 * u, (shY + hipY) / 2, -0.3 * u, shY);
+  c.closePath();
+  blob(c, k.coat, ow);
+  c.save(); c.clip();
+  if (kind === 'fire') {
+    for (const t of [0.62, 0.84]) {
+      const yy = shY + (hipY - shY) * t;
+      c.fillStyle = k.trim; c.fillRect(-u, yy - 0.045 * u, 2 * u, 0.09 * u);
+      c.strokeStyle = INK; c.lineWidth = ow * 0.5; c.strokeRect(-u, yy - 0.045 * u, 2 * u, 0.09 * u);
+    }
+  } else {
+    c.fillStyle = k.coatDark; c.fillRect(-u, hipY - 0.04 * u, 2 * u, 0.12 * u);
+  }
+  c.restore();
+
+  // Rescue backpack
+  const bpY = shY + 0.08 * u, bpH = 0.42 * u, bpW = 0.4 * u;
+  c.beginPath(); c.roundRect(-bpW / 2, bpY, bpW, bpH, 0.1 * u);
+  blob(c, kind === 'fire' ? '#e63946' : '#24489e', ow);
+  c.beginPath(); c.roundRect(-bpW * 0.36, bpY + bpH * 0.5, bpW * 0.72, bpH * 0.38, 0.06 * u);
+  blob(c, kind === 'fire' ? '#c1121f' : '#1a3577', ow * 0.7);
+  if (kind === 'fire') {
+    // a little water-hose nozzle
+    c.beginPath(); c.roundRect(bpW * 0.32, bpY + 0.04 * u, 0.1 * u, 0.3 * u, 0.04 * u); blob(c, '#c9d1d9', ow * 0.6);
+    c.fillStyle = '#ffd43b';
+    c.beginPath(); c.arc(0, bpY + bpH * 0.3, 0.07 * u, 0, Math.PI * 2); c.fill();
+  } else {
+    star(c, 0, bpY + bpH * 0.3, 0.09 * u, '#ffd43b', '#b8860b');
+  }
+  gloss(c, -bpW * 0.25, bpY + bpH * 0.2, 0.05 * u, 0.1 * u, 0.2);
+
+  // Collar
+  c.beginPath(); c.ellipse(0, shY - 0.02 * u, 0.24 * u, 0.07 * u, 0, 0, Math.PI * 2);
+  blob(c, k.collar, ow * 0.8);
+
+  // Head from behind
+  if (kind === 'fire') {
+    for (const s of [-1, 1]) { // upright corgi ears
+      c.beginPath();
+      c.moveTo(s * R * 0.2, headY - R * 0.7);
+      c.quadraticCurveTo(s * R * 0.55, headY - R * 1.65, s * R * 0.98, headY - R * 1.42);
+      c.quadraticCurveTo(s * R * 1.12, headY - R * 0.9, s * R * 0.95, headY - R * 0.3);
+      c.closePath();
+      blob(c, k.ear, ow);
+    }
+  }
+  c.beginPath(); c.ellipse(0, headY, R * 1.04, R * 0.98, 0, 0, Math.PI * 2);
+  blob(c, k.fur, ow);
+  gloss(c, -R * 0.45, headY - R * 0.35, R * 0.18, R * 0.32, 0.5, 0.3);
+  if (kind === 'police') {
+    for (const s of [-1, 1]) { // floppy beagle ears, flapping as he runs
+      c.save();
+      c.translate(s * R * 0.88, headY - R * 0.35);
+      c.rotate(s * (-0.2 - run * 0.25 * Math.abs(Math.sin(ph))));
+      c.beginPath(); c.ellipse(s * R * 0.08, R * 0.55, R * 0.3, R * 0.68, 0, 0, Math.PI * 2);
+      blob(c, k.ear, ow);
+      c.restore();
+    }
+  }
+  // Hats (back view)
+  if (kind === 'fire') {
+    c.beginPath(); c.ellipse(0, headY - R * 0.5, R * 0.84, R * 0.64, 0, Math.PI, 0); c.closePath();
+    blob(c, '#e63946', ow);
+    c.strokeStyle = '#ffd43b'; c.lineWidth = 0.06 * u;
+    c.beginPath(); c.moveTo(0, headY - R * 1.12); c.lineTo(0, headY - R * 0.55); c.stroke();
+    // long back brim of a firefighter helmet
+    c.beginPath();
+    c.moveTo(-R * 1.05, headY - R * 0.52);
+    c.quadraticCurveTo(0, headY - R * 0.3, R * 1.05, headY - R * 0.52);
+    c.quadraticCurveTo(R * 0.8, headY - R * 0.05, 0, headY - R * 0.02);
+    c.quadraticCurveTo(-R * 0.8, headY - R * 0.05, -R * 1.05, headY - R * 0.52);
+    blob(c, '#c1121f', ow);
+    gloss(c, -R * 0.4, headY - R * 0.85, R * 0.2, R * 0.1, -0.4, 0.5);
+  } else {
+    c.beginPath();
+    c.moveTo(-R * 0.66, headY - R * 0.58); c.lineTo(-R * 0.82, headY - R * 1.1);
+    c.quadraticCurveTo(0, headY - R * 1.42, R * 0.82, headY - R * 1.1); c.lineTo(R * 0.66, headY - R * 0.58);
+    c.closePath();
+    blob(c, '#1f3d8a', ow);
+    c.beginPath(); c.rect(-R * 0.68, headY - R * 0.72, R * 1.36, R * 0.17);
+    blob(c, '#14275a', ow * 0.7);
+    gloss(c, -R * 0.35, headY - R * 1.05, R * 0.2, R * 0.08, -0.2, 0.4);
+  }
+  c.restore();
+}
+
+let runPhase = 0, leanVis = 0, crouchVis = 0, prevLaneVis = 0, lastDraw = 0;
+
 function drawPlayer() {
-  if (!pose || !base) return;
+  if (state === 'idle') return;
   if (invul > 0 && Math.floor(invul * 12) % 2 === 0) return; // blink while invulnerable
+  const now = performance.now() / 1000;
+  const dt = Math.min(0.05, now - lastDraw || 0.016);
+  lastDraw = now;
+
+  const running = state === 'play' && lostFor === 0 ? 1 : 0;
+  runPhase += dt * (6 + speed * 0.45) * (running ? 1 : 0.0);
+  const vx = (laneVis - prevLaneVis) / Math.max(dt, 1e-3);
+  prevLaneVis = laneVis;
+  leanVis += (Math.max(-0.28, Math.min(0.28, vx * 0.12)) - leanVis) * Math.min(1, dt * 10);
+  crouchVis += ((ducking ? 1 : 0) - crouchVis) * Math.min(1, dt * 14);
 
   const ground = project(laneVis * LANE_W, 0, 0);
-  const bodyH = Math.max(0.05, base.ankleY - base.noseY) * 1.12; // nose→ankle ≈ 89% of height
-  const scale = (1.9 * view.unit) / bodyH;                  // the avatar is ~1.9 units tall
-  // Feet stay on the ground line: anchor to where your feet are now.
-  const footY = Math.max(pose[L_ANK].y, pose[R_ANK].y);
-  const P = (i) => ({
-    x: ground.x + (pose[i].x - m.hipX) * scale,
-    y: ground.y + (pose[i].y - footY) * scale - 0.1 * view.unit,
-  });
-
+  const u = view.unit;
   // Shadow
   ctx.fillStyle = 'rgba(30, 60, 20, 0.3)';
   ctx.beginPath();
-  ctx.ellipse(ground.x, ground.y, view.unit * 0.6, view.unit * 0.13, 0, 0, Math.PI * 2);
+  ctx.ellipse(ground.x, ground.y, u * 0.6, u * 0.13, 0, 0, Math.PI * 2);
   ctx.fill();
-
-  drawPup(ctx, P, view.unit, pupKind, gt + stateTime, ducking ? COLORS.ok : null);
+  if (ducking) {
+    ctx.strokeStyle = COLORS.ok; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.ellipse(ground.x, ground.y, u * 0.7, u * 0.16, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  drawPupBack(ctx, ground.x, ground.y, u, pupKind, {
+    run: running, phase: runPhase, crouch: crouchVis, lean: leanVis, time: now,
+  });
 }
 
 function drawEffect(e) {
