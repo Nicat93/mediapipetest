@@ -975,35 +975,56 @@ function drawFace(c, k, kind, R, u, time, ol) {
       c.restore();
     }
   }
-  // eyes
+  // Eyes: determined look, with the upper lid slanting down toward the nose
   for (const s of [-1, 1]) {
-    const ex = s * R * 0.36, ey = -R * 0.08;
-    c.beginPath(); c.ellipse(ex, ey, R * 0.2, R * 0.24, 0, 0, Math.PI * 2);
-    outlined('#fff', ol, Math.max(1, 0.025 * u), c);
-    c.beginPath(); c.arc(ex + s * R * 0.02, ey + R * 0.03, R * 0.15, 0, Math.PI * 2);
-    c.fillStyle = k.eye; c.fill();
-    c.beginPath(); c.arc(ex + s * R * 0.02, ey + R * 0.05, R * 0.08, 0, Math.PI * 2);
-    c.fillStyle = '#000'; c.fill();
-    c.beginPath(); c.arc(ex - R * 0.04, ey - R * 0.05, R * 0.055, 0, Math.PI * 2);
+    const ex = s * R * 0.34, ey = -R * 0.06;
+    c.save();
+    c.beginPath(); c.ellipse(ex, ey, R * 0.19, R * 0.23, 0, 0, Math.PI * 2);
     c.fillStyle = '#fff'; c.fill();
+    c.clip();
+    c.beginPath(); c.arc(ex - s * R * 0.02, ey + R * 0.03, R * 0.155, 0, Math.PI * 2);
+    c.fillStyle = k.eye; c.fill();
+    c.beginPath(); c.arc(ex - s * R * 0.03, ey + R * 0.04, R * 0.075, 0, Math.PI * 2);
+    c.fillStyle = '#0b0b12'; c.fill();
+    c.beginPath(); c.arc(ex - s * R * 0.07, ey - R * 0.01, R * 0.04, 0, Math.PI * 2);
+    c.fillStyle = '#fff'; c.fill();
+    // upper lid: covers the top of the eye, lower on the inner side
+    c.beginPath();
+    c.moveTo(ex - s * R * 0.3, ey - R * 0.12);
+    c.lineTo(ex + s * R * 0.3, ey - R * 0.22);
+    c.lineTo(ex + s * R * 0.3, ey - R * 0.4);
+    c.lineTo(ex - s * R * 0.3, ey - R * 0.4);
+    c.closePath();
+    c.fillStyle = k.fur; c.fill();
+    c.restore();
+    c.beginPath(); c.ellipse(ex, ey, R * 0.19, R * 0.23, 0, 0, Math.PI * 2);
+    c.save(); c.clip();
+    c.strokeStyle = ol; c.lineWidth = Math.max(2, 0.05 * u);
+    c.beginPath(); c.moveTo(ex - s * R * 0.3, ey - R * 0.12); c.lineTo(ex + s * R * 0.3, ey - R * 0.22); c.stroke();
+    c.restore();
+    c.strokeStyle = ol; c.lineWidth = Math.max(1.5, 0.03 * u);
+    c.beginPath(); c.ellipse(ex, ey, R * 0.19, R * 0.23, 0, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+    // bold eyebrow, angled down toward the nose
+    c.strokeStyle = kind === 'police' ? '#3a2010' : '#9a4d12';
+    c.lineWidth = Math.max(2.5, 0.075 * R + 0.02 * u);
+    c.beginPath();
+    c.moveTo(ex - s * R * 0.17, ey - R * 0.3);
+    c.quadraticCurveTo(ex + s * R * 0.03, ey - R * 0.42, ex + s * R * 0.24, ey - R * 0.4);
+    c.stroke();
   }
-  // cheeks
-  c.fillStyle = 'rgba(255, 120, 140, 0.35)';
-  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * R * 0.62, R * 0.35, R * 0.14, R * 0.09, 0, 0, Math.PI * 2); c.fill(); }
-  // nose + smile + tongue
+  // Nose
   c.beginPath(); c.ellipse(0, R * 0.24, R * 0.19, R * 0.13, 0, 0, Math.PI * 2);
   c.fillStyle = '#2b1d14'; c.fill();
-  c.beginPath(); c.ellipse(-R * 0.04, R * 0.19, R * 0.04, R * 0.025, 0, 0, Math.PI * 2);
+  c.beginPath(); c.ellipse(-R * 0.05, R * 0.19, R * 0.05, R * 0.03, 0, 0, Math.PI * 2);
   c.fillStyle = 'rgba(255,255,255,0.7)'; c.fill();
-  c.strokeStyle = ol; c.lineWidth = Math.max(1.5, 0.03 * u);
+  // Confident smile, a little higher on one side
+  c.strokeStyle = ol; c.lineWidth = Math.max(1.5, 0.035 * u);
   c.beginPath();
-  c.moveTo(0, R * 0.32); c.lineTo(0, R * 0.42);
-  c.moveTo(-R * 0.22, R * 0.42); c.quadraticCurveTo(-R * 0.1, R * 0.55, 0, R * 0.42);
-  c.quadraticCurveTo(R * 0.1, R * 0.55, R * 0.22, R * 0.42);
+  c.moveTo(0, R * 0.36); c.lineTo(0, R * 0.44);
+  c.moveTo(-R * 0.2, R * 0.43);
+  c.quadraticCurveTo(-R * 0.08, R * 0.5, 0, R * 0.44);
+  c.quadraticCurveTo(R * 0.14, R * 0.52, R * 0.27, R * 0.37);
   c.stroke();
-  const tongue = 0.12 + Math.abs(Math.sin(time * 6)) * 0.06;
-  c.beginPath(); c.ellipse(R * 0.05, R * (0.5 + tongue / 2), R * 0.09, R * tongue, 0, 0, Math.PI);
-  c.fillStyle = '#ff7a95'; c.fill();
 
   // Hats
   if (kind === 'fire') {
