@@ -20,6 +20,9 @@ const BONES = [
 const START_LIVES = 3;
 const LANE_ENTER = 0.75;   // hip offset (in shoulder widths) to move into a side lane
 const LANE_EXIT = 0.45;    // ...and to come back to the middle
+const LANE_STEP = 1.0;     // hip offset (in shoulder widths) that puts the avatar in the middle of a side lane
+const MOVE_SMOOTH = 10;    // how quickly the avatar follows you sideways (higher = snappier)
+const POSE_SMOOTH = 0.5;   // 0..1, how much of each new pose frame to take (lower = smoother, laggier)
 const ENABLE_JUMP = false; // jumping is switched off for now (no hurdles, no high coins)
 const JUMP_RISE = 0.14;    // hip rise (in torso lengths) that counts as a jump
 const DUCK_DROP = 0.30;    // head drop (in torso lengths) that counts as a squat
@@ -48,11 +51,14 @@ let wantStart = false;
 let lastVideoTime = -1;
 
 // Tracking
-let pose = null;   // landmarks in mirrored video pixels: {x, y, v, inFrame}
+// Coordinates are in units of the video height (x: 0..aspect, y: 0..1), so they
+// don't change when the camera resolution does (a phone stream over Wi-Fi starts
+// small and sharpens after a few seconds).
+let pose = null;   // smoothed, mirrored landmarks: {x, y, v, inFrame}
 let m = null;      // current body measurements
 let base = null;   // calibrated standing pose
 let calib = [];    // samples while calibrating
-let lane = 0, laneVis = 0, jumping = false, ducking = false;
+let lane = 0, laneVis = 0, bodyX = 0, jumping = false, ducking = false;
 
 // Game
 let state = 'idle'; // idle | frame | calibrate | countdown | play | over
@@ -134,7 +140,7 @@ function setState(s) { state = s; stateTime = 0; }
 function newGame() {
   score = 0; bonus = 0; coins = 0; lives = START_LIVES; invul = 0; shake = 0; flash = 0;
   objects = []; effects = []; gt = 0; distance = 0; speed = 0; nextRowIn = 0;
-  lane = 0; laneVis = 0; base = null; calib = [];
+  lane = 0; laneVis = 0; bodyX = 0; base = null; calib = [];
   overlay.hidden = true;
   hud.hidden = false;
   updateHud();
@@ -177,13 +183,18 @@ function track(now) {
   const lms = landmarker.detectForVideo(video, now).landmarks?.[0];
   if (!lms) { pose = null; m = null; return; }
 
-  const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
-  pose = lms.map((p) => ({
-    x: (1 - p.x) * vw, // mirrored: step right → move right on screen
-    y: p.y * vh,
-    v: p.visibility ?? 1,
-    inFrame: p.x > 0.01 && p.x < 0.99 && p.y > 0.01 && p.y < 0.99,
-  }));
+  const aspect = (video.videoWidth || 640) / (video.videoHeight || 480);
+  const prevPose = pose;
+  pose = lms.map((p, i) => {
+    let x = (1 - p.x) * aspect; // mirrored: step right → move right on screen
+    let y = p.y;
+    const old = prevPose?.[i];
+    if (old) { // light smoothing against landmark jitter
+      x = old.x + (x - old.x) * POSE_SMOOTH;
+      y = old.y + (y - old.y) * POSE_SMOOTH;
+    }
+    return { x, y, v: p.visibility ?? 1, inFrame: p.x > 0.01 && p.x < 0.99 && p.y > 0.01 && p.y < 0.99 };
+  });
   const hip = mid(pose[L_HIP], pose[R_HIP]);
   const sh = mid(pose[L_SH], pose[R_SH]);
   m = {
@@ -192,15 +203,17 @@ function track(now) {
     hipY: hip.y,
     noseY: pose[NOSE].y,
     ankleY: (pose[L_ANK].y + pose[R_ANK].y) / 2,
-    shoulderW: Math.max(dist(pose[L_SH], pose[R_SH]), 1),
-    torso: Math.max(dist(sh, hip), 1),
+    shoulderW: Math.max(dist(pose[L_SH], pose[R_SH]), 0.01),
+    torso: Math.max(dist(sh, hip), 0.01),
     wristY: Math.max(pose[L_WR].y, pose[R_WR].y), // the lower of the two wrists
   };
 
   if (!base || !m.visible) return;
 
-  // Lanes, with hysteresis so you don't flicker at the edges.
+  // Lanes, with hysteresis so you don't flicker at the edges. bodyX is the
+  // continuous position (in lanes) that the avatar follows smoothly.
   const off = (m.hipX - base.hipX) / base.shoulderW;
+  bodyX = Math.max(-1.3, Math.min(1.3, off / LANE_STEP));
   if (lane === 0) lane = off > LANE_ENTER ? 1 : off < -LANE_ENTER ? -1 : 0;
   else if (lane === 1) lane = off < -LANE_ENTER ? -1 : off < LANE_EXIT ? 0 : 1;
   else lane = off > LANE_ENTER ? 1 : off > -LANE_EXIT ? 0 : -1;
@@ -258,7 +271,10 @@ function update(dt) {
   shake = Math.max(0, shake - dt);
   flash = Math.max(0, flash - dt);
   effects = effects.filter((e) => (e.t += dt) < e.life);
-  laneVis += (lane - laneVis) * Math.min(1, dt * 12);
+  // Follow the body continuously, but lean toward the lane the game counts you in,
+  // so what you see matches what you collide with.
+  const target = base ? bodyX * 0.6 + lane * 0.4 : 0;
+  laneVis += (target - laneVis) * (1 - Math.exp(-dt * MOVE_SMOOTH));
 
   if (state === 'frame') {
     if (m?.visible) { if (stateTime > 0.8) { setState('calibrate'); calib = []; } } else stateTime = 0;
@@ -591,12 +607,15 @@ function drawPlayer() {
   if (invul > 0 && Math.floor(invul * 12) % 2 === 0) return; // blink while invulnerable
 
   const ground = project(laneVis * LANE_W, 0, 0);
-  const bodyH = Math.max(1, base.ankleY - base.noseY) * 1.12; // nose→ankle ≈ 89% of height
+  const bodyH = Math.max(0.05, base.ankleY - base.noseY) * 1.12; // nose→ankle ≈ 89% of height
   const scale = (1.9 * view.unit) / bodyH;                  // the avatar is ~1.9 units tall
+  // Feet stay on the ground line: anchor to where your feet are now (not where they
+  // were during calibration), so stepping closer or further can't push the avatar off screen.
   const rise = ENABLE_JUMP ? Math.max(0, base.ankleY - m.ankleY) * 1.6 : 0; // exaggerate jumps a bit
+  const footY = ENABLE_JUMP ? base.ankleY : Math.max(pose[L_ANK].y, pose[R_ANK].y);
   const pt = (i) => ({
     x: ground.x + (pose[i].x - m.hipX) * scale,
-    y: ground.y + (pose[i].y - base.ankleY - rise) * scale,
+    y: ground.y + (pose[i].y - footY - rise) * scale,
   });
 
   // Shadow
@@ -644,6 +663,7 @@ function drawEffect(e) {
 function drawCameraInset(W, H) {
   if (video.readyState < 2) return;
   const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+  const aspect = vw / vh;
   const w = Math.min(W * 0.22, 300), h = (w * vh) / vw;
   const x = W - w - 16, y = 64;
   ctx.save();
@@ -661,15 +681,15 @@ function drawCameraInset(W, H) {
     for (const [a, b] of BONES) {
       if (pose[a].v < 0.3 || pose[b].v < 0.3) continue;
       ctx.beginPath();
-      ctx.moveTo(x + (pose[a].x / vw) * w, y + (pose[a].y / vh) * h);
-      ctx.lineTo(x + (pose[b].x / vw) * w, y + (pose[b].y / vh) * h);
+      ctx.moveTo(x + (pose[a].x / aspect) * w, y + pose[a].y * h);
+      ctx.lineTo(x + (pose[b].x / aspect) * w, y + pose[b].y * h);
       ctx.stroke();
     }
   }
   // Lane guide: where you need to stand for each lane
   if (base && state === 'play') {
     for (const l of [-1, 1]) {
-      const gx = x + ((base.hipX + l * LANE_ENTER * base.shoulderW) / vw) * w;
+      const gx = x + ((base.hipX + l * LANE_ENTER * base.shoulderW) / aspect) * w;
       ctx.strokeStyle = 'rgba(34, 228, 255, 0.5)';
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
