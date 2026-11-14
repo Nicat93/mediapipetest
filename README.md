@@ -7,6 +7,7 @@ tracking that runs entirely in the browser. The root `index.html` is a menu that
 | --- | --- | --- |
 | [`ride/`](ride/) | **Pose Rider** (bike, `ride/index.html`) and **Pose Driver** (car, `ride/car.html`) | Pose tracking: tilt your hands like handlebars / a steering wheel. Phone-as-camera over Wi-Fi. Keyboard and touch fallback. See [`ride/README.md`](ride/README.md). |
 | [`cooking/`](cooking/) | **Little Chef**, a cooking game for 3–5 year olds | Hand tracking: hold a hand over food to pick it up, move it to the pot, wave to cook. Touch / mouse: drag or tap. |
+| [`arcade/`](arcade/) | **Bubble Pop** (`arcade/bubble-pop.html`), **Body Blitz** (`arcade/body-blitz.html`) and **Neon Dash** (`arcade/neon-dash.html`) | Bubble Pop: hand tracking, pop bubbles with your hands. Body Blitz and Neon Dash: full-body pose tracking (hit targets, dodge, switch lanes, squat). PC webcam or phone over Wi-Fi. See [`arcade/README.md`](arcade/README.md). |
 
 ## Adding a game
 

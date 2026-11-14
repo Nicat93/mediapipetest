@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b1020" />
+    <title>Body Blitz</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <video id="cam" playsinline muted autoplay></video>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="body-hud" hidden>
+      <span id="score">0</span>
+      <span id="mult">x1</span>
+      <span id="lives"></span>
+    </div>
+
+    <div id="overlay">
+      <h1>Body Blitz</h1>
+      <p id="msg">
+        Stand 2–3 m back so your whole body is in view.
+        Hit <b class="c-hand">blue</b> targets with your hands, <b class="c-foot">orange</b> ones with your feet,
+        and <b class="c-laser">duck</b> under the red lasers.
+      </p>
+      <label class="cam-pick">
+        Camera
+        <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
+      </label>
+      <div id="link" hidden>
+        <span class="state">Getting a pairing code…</span>
+        <code class="url">…</code>
+      </div>
+      <button id="start">Start</button>
+      <nav class="games">
+        <a class="other-game" href="bubble-pop.html">Bubble Pop</a>
+        <a class="other-game" href="neon-dash.html">Neon Dash</a>
+        <a class="other-game" href="../">All games</a>
+      </nav>
+    </div>
+
+    <script type="module" src="js/body-blitz.js"></script>
+  </body>
+</html>

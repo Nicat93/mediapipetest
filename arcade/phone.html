@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MP Arcade Camera</title>
+  <meta name="description" content="Use this phone as the camera for MP Arcade games on your computer.">
+  <meta name="theme-color" content="#2b2d42">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="phone.css">
+  <script type="module" src="js/phone.js"></script>
+</head>
+<body>
+  <video id="preview" playsinline muted autoplay></video>
+
+  <header>
+    <span class="brand">MP Arcade</span>
+    <span id="status" class="pill">Starting…</span>
+  </header>
+
+  <main id="card" class="card">
+    <h1 id="title">Phone camera</h1>
+    <p id="message">Getting ready…</p>
+    <form id="code-form" class="hidden">
+      <label for="code">Code shown on your computer</label>
+      <input id="code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="6" placeholder="ABC123">
+      <button class="primary" type="submit">Connect</button>
+    </form>
+    <div class="buttons">
+      <button id="btn-retry" class="primary hidden" type="button">Reconnect</button>
+    </div>
+  </main>
+
+  <footer>
+    <button id="btn-flip" type="button" class="hidden">Switch camera</button>
+    <button id="btn-hide" type="button" class="hidden">Hide tips</button>
+  </footer>
+</body>
+</html>

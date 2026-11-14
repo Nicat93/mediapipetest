@@ -1,0 +1,103 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: #0b1020;
+  color: #fff;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Camera is hidden; the game canvas draws the (mirrored) video itself. */
+#cam { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+#game { position: fixed; inset: 0; width: 100vw; height: 100dvh; display: block; }
+
+#hud {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 28px;
+  font-weight: 700;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+#hud[hidden] { display: none; }
+#score::before { content: "Score "; font-weight: 400; opacity: 0.8; }
+#time::after { content: "s"; font-weight: 400; opacity: 0.8; }
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(11, 16, 32, 0.82);
+}
+#overlay[hidden] { display: none; }
+#overlay h1 { font-size: 44px; }
+#overlay p { max-width: 340px; font-size: 18px; line-height: 1.4; opacity: 0.9; }
+
+#start {
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  padding: 14px 44px;
+  border: 0;
+  border-radius: 999px;
+  background: #4cc9f0;
+  color: #0b1020;
+}
+#start:disabled { opacity: 0.5; }
+
+/* Body Blitz HUD: score · multiplier · lives */
+.body-hud #mult { color: #ff9f1c; }
+.body-hud #lives { color: #ff3b5c; letter-spacing: 4px; }
+.body-hud #score::before { content: "Score "; }
+.c-hand { color: #4cc9f0; }
+.c-foot { color: #ff9f1c; }
+.c-laser { color: #ff3b5c; }
+.c-coin { color: #ffd23f; }
+.games { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+.games .other-game::after { content: " →"; }
+
+.other-game { color: #4cc9f0; font-size: 16px; text-decoration: none; opacity: 0.85; }
+.other-game:hover { text-decoration: underline; }
+
+#link { display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+#link[hidden] { display: none; }
+#link.ok .state { color: #7ee787; }
+#link.ok .url { display: none; }
+#link .url {
+  font-size: 18px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #141b33;
+  user-select: all;
+}
+
+.cam-pick { display: flex; flex-direction: column; gap: 6px; font-size: 14px; opacity: 0.9; }
+#camera {
+  font: inherit;
+  font-size: 16px;
+  max-width: min(360px, 90vw);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #4cc9f0;
+  background: #141b33;
+  color: #fff;
+}
+
+#link .qr { width: 168px; max-width: 50vw; align-self: center; background: #fff; border-radius: 10px; padding: 6px; }
+#link .qr:empty, #link .qr[hidden] { display: none; }
+#link .qr svg { display: block; width: 100%; height: auto; }

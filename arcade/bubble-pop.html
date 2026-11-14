@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b1020" />
+    <title>Bubble Pop</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <video id="cam" playsinline muted autoplay></video>
+    <canvas id="game"></canvas>
+
+    <div id="hud" hidden>
+      <span id="score">0</span>
+      <span id="time">60</span>
+    </div>
+
+    <div id="overlay">
+      <h1>Bubble Pop</h1>
+      <p id="msg">Pick your camera, step back a little, and pop bubbles with your hands.</p>
+      <label class="cam-pick">
+        Camera
+        <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
+      </label>
+      <div id="link" hidden>
+        <span class="state">Getting a pairing code…</span>
+        <code class="url">…</code>
+      </div>
+      <button id="start">Start</button>
+      <nav class="games">
+        <a class="other-game" href="neon-dash.html">Neon Dash (full body)</a>
+        <a class="other-game" href="body-blitz.html">Body Blitz (full body)</a>
+        <a class="other-game" href="../">All games</a>
+      </nav>
+    </div>
+
+    <script type="module" src="js/bubble-pop.js"></script>
+  </body>
+</html>

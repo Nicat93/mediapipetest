@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b1020" />
+    <title>Neon Dash</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <video id="cam" playsinline muted autoplay></video>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="body-hud" hidden>
+      <span id="score">0</span>
+      <span id="dist">0 m</span>
+      <span id="lives"></span>
+    </div>
+
+    <div id="overlay">
+      <h1>Neon Dash</h1>
+      <p id="msg">
+        Run with your whole body. <b>Step left/right</b> to switch lanes and dodge the crates,
+        <b class="c-laser">squat</b> under the striped gates, and grab the <b class="c-coin">coins</b>. Stand 2–3 m back so you're fully in view.
+      </p>
+      <label class="cam-pick">
+        Camera
+        <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
+      </label>
+      <div id="link" hidden>
+        <span class="state">Getting a pairing code…</span>
+        <code class="url">…</code>
+      </div>
+      <button id="start">Start</button>
+      <nav class="games">
+        <a class="other-game" href="bubble-pop.html">Bubble Pop</a>
+        <a class="other-game" href="body-blitz.html">Body Blitz</a>
+        <a class="other-game" href="../">All games</a>
+      </nav>
+    </div>
+
+    <script type="module" src="js/neon-dash.js"></script>
+  </body>
+</html>
