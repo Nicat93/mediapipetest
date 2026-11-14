@@ -14,6 +14,11 @@ const MODEL_URL =
 const REGION = { x0: 0.12, x1: 0.88, y0: 0.08, y1: 0.78 };
 const PALM = [0, 5, 9, 13, 17];
 const LOST_MS = 300; // keep a cursor alive through brief tracking dropouts
+// Fist detection: how far the fingertips are from the wrist, measured in palm
+// lengths (wrist to middle-finger knuckle). Open hand ≈ 1.8+, fist ≈ 1.0.
+const TIPS = [8, 12, 16, 20];
+const FIST_CLOSE = 1.3; // below this the hand counts as closed…
+const FIST_OPEN = 1.55; // …and above this as open again (gap avoids flicker)
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
@@ -25,7 +30,7 @@ export class HandTracker {
     this.draw = new DrawingUtils(this.ctx);
     this.landmarker = null;
     this.lastVideoTime = -1;
-    /** @type {{id:number, x:number, y:number, seen:number}[]} normalised 0..1 screen coords */
+    /** @type {{id:number, x:number, y:number, seen:number, fist:boolean}[]} normalised 0..1 screen coords */
     this.cursors = [];
     this.nextId = 1;
   }
@@ -80,7 +85,8 @@ export class HandTracker {
       }
       const result = this.landmarker.detectForVideo(v, now);
       const hands = result.landmarks || [];
-      this.match(hands.map((lm) => this.palmPoint(lm)), now);
+      const aspect = v.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : 4 / 3;
+      this.match(hands.map((lm) => ({ ...this.palmPoint(lm), open: this.openness(lm, aspect) })), now);
       this.render(hands);
     }
     this.cursors = this.cursors.filter((c) => now - c.seen < LOST_MS);
@@ -103,6 +109,15 @@ export class HandTracker {
     };
   }
 
+  /** Fingertip distance from the wrist in palm lengths (small = fist). */
+  openness(lm, aspect) {
+    const d = (a, b) => Math.hypot((a.x - b.x) * aspect, a.y - b.y);
+    const palm = Math.max(d(lm[0], lm[9]), 1e-4);
+    let sum = 0;
+    for (const i of TIPS) sum += d(lm[i], lm[0]);
+    return sum / TIPS.length / palm;
+  }
+
   /** Keep cursor identities stable by pairing each new point with the nearest old cursor. */
   match(points, now) {
     const free = [...this.cursors];
@@ -122,9 +137,12 @@ export class HandTracker {
         best.x += (p.x - best.x) * 0.6;
         best.y += (p.y - best.y) * 0.6;
         best.seen = now;
+        best.open += (p.open - best.open) * 0.5;
       } else {
-        this.cursors.push({ id: this.nextId++, x: p.x, y: p.y, seen: now });
+        best = { id: this.nextId++, x: p.x, y: p.y, seen: now, open: p.open, fist: false };
+        this.cursors.push(best);
       }
+      if (best.fist ? best.open > FIST_OPEN : best.open < FIST_CLOSE) best.fist = !best.fist;
     }
   }
 

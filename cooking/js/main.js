@@ -47,6 +47,7 @@ const RECIPES = [
 const PRAISE = ['Yummy!', 'Great job!', 'Well done!', 'Nice!', 'Super!', 'Mmm!'];
 const GRAB_TIME = 0.45; // seconds a hand hovers over food to pick it up
 const BUTTON_TIME = 1.0; // seconds a hand hovers over a button to press it
+const RELEASE_TIME = 0.15; // an opened hand must stay open this long to let go (ignores flicker)
 const COOK_WORK = 5; // how many dish-widths of waving/rubbing cooks the dish
 
 const ui = {
@@ -477,7 +478,7 @@ function handAgent(id) {
     el.className = 'hand-cursor';
     el.innerHTML = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" pathLength="100"/></svg><span>✋</span>';
     ui.cursors.appendChild(el);
-    a = { id, el, ring: el.querySelector('circle'), icon: el.querySelector('span'), held: null, target: null, dwell: 0, block: null, x: 0, y: 0, px: null, py: null };
+    a = { id, el, ring: el.querySelector('circle'), icon: el.querySelector('span'), held: null, grabbed: false, openT: 0, wasFist: false, target: null, dwell: 0, block: null, x: 0, y: 0, px: null, py: null };
     hands.set(id, a);
   }
   return a;
@@ -513,9 +514,24 @@ function updateHands(dt, now) {
     a.y = c.y * window.innerHeight;
     a.el.style.transform = `translate(${a.x}px, ${a.y}px)`;
 
+    // Grab gesture: close the hand (make a fist) over food to pick it up, open it to
+    // let go. Food let go over the pot goes in; anywhere else it goes back to the shelf.
+    // Hovering still works too (for small hands that don't close well): food picked
+    // up that way drops into the pot by itself.
+    const closing = c.fist && !a.wasFist;
+    a.wasFist = c.fist;
     if (a.held) {
       a.held.el.style.transform = `translate(${a.x}px, ${a.y - 34}px)`; // food sits on top of the fist
-      if (overDish(a.x, a.y, 0.95)) {
+      a.openT = c.fist ? 0 : a.openT + dt;
+      if (a.grabbed) {
+        if (a.openT >= RELEASE_TIME) {
+          if (overDish(a.x, a.y, 1.1)) tryAdd(a.held);
+          else returnToTile(a.held);
+          a.held = null;
+          a.grabbed = false;
+          a.block = null;
+        }
+      } else if (overDish(a.x, a.y, 0.95)) {
         tryAdd(a.held);
         a.held = null;
         a.block = null;
@@ -535,8 +551,11 @@ function updateHands(dt, now) {
         a.dwell = 0;
       }
       if (target) {
+        // A fist over a food grabs it at once; a hand that is already a fist and
+        // moves onto one grabs it too (small children rarely open in between).
+        const grab = c.fist && (closing || target.classList.contains('tile'));
         a.dwell += dt;
-        if (a.dwell >= need) {
+        if (grab || (!c.fist && a.dwell >= need)) {
           a.dwell = 0;
           a.target = null;
           if (target.classList.contains('tile')) {
@@ -544,6 +563,8 @@ function updateHands(dt, now) {
             target.classList.add('lifted');
             const key = target.dataset.key;
             a.held = { key, tile: target, el: makeFloating(key, a.x, a.y - 34) };
+            a.grabbed = grab;
+            a.openT = 0;
             sfx.pick();
           } else {
             a.block = target;
@@ -551,10 +572,10 @@ function updateHands(dt, now) {
           }
         }
       }
-      a.ring.style.strokeDasharray = `${target ? ((a.dwell / need) * 100).toFixed(1) : 0} 100`;
+      a.ring.style.strokeDasharray = `${target && !c.fist ? ((a.dwell / need) * 100).toFixed(1) : 0} 100`;
     }
     a.el.classList.toggle('holding', !!a.held);
-    a.icon.textContent = a.held ? '✊' : '✋';
+    a.icon.textContent = a.held || c.fist ? '✊' : '✋';
 
     if (phase === 'cook' && a.px !== null && overDish(a.x, a.y, 1.05)) {
       addCookWork(Math.hypot(a.x - a.px, a.y - a.py) / (dishGeom().r * 2 * COOK_WORK));
