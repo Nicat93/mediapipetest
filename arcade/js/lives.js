@@ -13,7 +13,8 @@ export function livesPicker(select, storageKey, fallback = 3) {
   );
   let saved = null;
   try { saved = localStorage.getItem(storageKey); } catch {}
-  select.value = [...select.options].some((o) => o.value === saved) ? saved : String(fallback);
+  const fb = fallback === Infinity ? 'inf' : String(fallback);
+  select.value = [...select.options].some((o) => o.value === saved) ? saved : fb;
   select.addEventListener('change', () => {
     try { localStorage.setItem(storageKey, select.value); } catch {}
   });

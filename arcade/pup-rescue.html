@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#4fb8ff" />
+    <title>Pup Rescue Run</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="pup-theme">
+    <video id="cam" playsinline muted autoplay></video>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="body-hud" hidden>
+      <span id="score">0</span>
+      <span id="dist">0 m</span>
+      <span id="lives"></span>
+    </div>
+
+    <div id="overlay">
+      <h1>Pup Rescue Run</h1>
+      <p id="msg">
+        Pick your pup! Then <b>step left and right</b> to run around the cones,
+        <b class="c-laser">duck down</b> under the bridges and collect the <b class="c-coin">bones</b>.
+      </p>
+      <div class="pup-pick" role="group" aria-label="Choose your pup">
+        <button type="button" data-pup="fire" aria-pressed="true"><canvas aria-hidden="true"></canvas><span>Fire pup</span></button>
+        <button type="button" data-pup="police" aria-pressed="false"><canvas aria-hidden="true"></canvas><span>Police pup</span></button>
+      </div>
+      <button id="start">Start</button>
+      <details class="grown-ups">
+        <summary>For grown-ups</summary>
+        <p>Stand 2–3 m from the camera so the whole body is in view. The game is slow and gentle, with infinite lives by default.</p>
+        <label class="cam-pick">
+          Camera
+          <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
+        </label>
+        <label class="cam-pick">
+          Lives
+          <select id="lives-pick"><option value="inf">∞ Infinite</option></select>
+        </label>
+        <div id="link" hidden>
+          <span class="state">Getting a pairing code…</span>
+          <code class="url">…</code>
+        </div>
+        <nav class="games">
+          <a class="other-game" href="neon-dash.html">Neon Dash</a>
+          <a class="other-game" href="../">All games</a>
+        </nav>
+      </details>
+    </div>
+
+    <script type="module" src="js/pup-rescue.js"></script>
+  </body>
+</html>

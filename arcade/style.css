@@ -101,3 +101,61 @@ html, body {
 #link .qr { width: 168px; max-width: 50vw; align-self: center; background: #fff; border-radius: 10px; padding: 6px; }
 #link .qr:empty, #link .qr[hidden] { display: none; }
 #link .qr svg { display: block; width: 100%; height: auto; }
+
+/* ---------- Pup Rescue Run: bright, kid-friendly theme ---------- */
+.pup-theme { background: #4fb8ff; font-family: "Baloo 2", system-ui, sans-serif; }
+.pup-theme #overlay {
+  background: linear-gradient(180deg, rgba(79, 184, 255, 0.93), rgba(200, 240, 255, 0.93));
+  color: #1d3557;
+  overflow-y: auto;
+  justify-content: flex-start;
+  padding-top: max(24px, 4vh);
+}
+.pup-theme #overlay h1 {
+  font-size: clamp(40px, 8vw, 64px);
+  line-height: 1;
+  color: #ff8c42;
+  -webkit-text-stroke: 2px #1d3557;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 #1d3557;
+}
+.pup-theme #overlay p { max-width: 460px; font-size: 20px; opacity: 1; }
+.pup-theme .c-laser { color: #e63946; }
+.pup-theme .c-coin { color: #b5651d; }
+.pup-theme #start {
+  font-family: inherit;
+  font-size: 30px;
+  font-weight: 800;
+  padding: 10px 64px;
+  background: #ff5a5f;
+  color: #fff;
+  box-shadow: 0 6px 0 #b8323a;
+}
+.pup-theme #start:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8323a; }
+.pup-pick { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.pup-pick button {
+  font: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  color: #1d3557;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 18px 8px;
+  border-radius: 24px;
+  border: 4px solid transparent;
+  background: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.pup-pick button canvas { width: 120px; height: 150px; }
+.pup-pick button[aria-pressed="true"] { border-color: #ff8c42; background: #fff; transform: scale(1.06); box-shadow: 0 6px 18px rgba(29, 53, 87, 0.25); }
+.pup-pick button[data-pup="fire"][aria-pressed="true"] { border-color: #e63946; }
+.pup-pick button[data-pup="police"][aria-pressed="true"] { border-color: #3a86ff; }
+.grown-ups { max-width: 460px; font-size: 16px; }
+.grown-ups summary { cursor: pointer; opacity: 0.8; }
+.grown-ups[open] { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.grown-ups p { font-size: 16px !important; }
+.pup-theme .other-game { color: #1d3557; }
+.pup-theme #hud { color: #fff; -webkit-text-stroke: 1px #1d3557; paint-order: stroke fill; font-family: "Baloo 2", system-ui, sans-serif; }
+.pup-theme .body-hud #lives { color: #ff5a5f; }
