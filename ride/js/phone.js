@@ -12,12 +12,16 @@ const ui = {
   code: $('code'),
   retry: $('btn-retry'),
   flip: $('btn-flip'),
+  rotate: $('btn-rotate'),
   hide: $('btn-hide'),
 };
 
 let code = '';
 let facing = 'user'; // 'user' (selfie) | 'environment' (back)
-let stream = null;
+let camStream = null; // what the camera gives
+let stream = null;    // what we send: camStream, or a 180°-rotated copy of it
+let upsideDown = false; // phone stands upside down (e.g. charging port at the top)
+try { upsideDown = localStorage.getItem('phonecam.upsideDown') === '1'; } catch {}
 let peer = null;
 let call = null;
 let wakeLock = null;
@@ -56,6 +60,62 @@ async function getCamera() {
   return s;
 }
 
+// ---- upside-down mode: redraw each camera frame rotated by 180° on a canvas
+// and send the canvas as the video track.
+const rot = { video: null, canvas: null, handle: 0, out: null };
+
+function stopRotation() {
+  if (rot.video?.cancelVideoFrameCallback && rot.handle) rot.video.cancelVideoFrameCallback(rot.handle);
+  cancelAnimationFrame(rot.handle);
+  rot.handle = 0;
+  rot.out?.getTracks().forEach((t) => t.stop());
+  rot.out = null;
+}
+
+function rotatedCopy(src) {
+  if (!rot.video) {
+    rot.video = Object.assign(document.createElement('video'), { muted: true, playsInline: true, autoplay: true });
+    rot.video.setAttribute('playsinline', '');
+    rot.video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(rot.video);
+    rot.canvas = document.createElement('canvas');
+  }
+  const v = rot.video, cv = rot.canvas, cx = cv.getContext('2d');
+  v.srcObject = src;
+  v.play().catch(() => {});
+  const set = src.getVideoTracks()[0]?.getSettings() || {};
+  cv.width = set.width || 640;
+  cv.height = set.height || 480;
+  const useVfc = 'requestVideoFrameCallback' in v;
+  const draw = () => {
+    if (v.videoWidth && (cv.width !== v.videoWidth || cv.height !== v.videoHeight)) {
+      cv.width = v.videoWidth; // the phone turned between portrait and landscape
+      cv.height = v.videoHeight;
+    }
+    if (v.readyState >= 2) {
+      cx.setTransform(-1, 0, 0, -1, cv.width, cv.height); // rotate 180°
+      cx.drawImage(v, 0, 0, cv.width, cv.height);
+    }
+    rot.handle = useVfc ? v.requestVideoFrameCallback(draw) : requestAnimationFrame(draw);
+  };
+  draw();
+  rot.out = cv.captureStream(30);
+  const track = rot.out.getVideoTracks()[0];
+  if (track && 'contentHint' in track) track.contentHint = 'motion';
+  return rot.out;
+}
+
+/** Rebuilds the outgoing stream from camStream and swaps it into a live call. */
+async function updateOutput() {
+  stopRotation();
+  stream = upsideDown ? rotatedCopy(camStream) : camStream;
+  showPreview(stream);
+  ui.rotate.textContent = upsideDown ? 'Upside down: on' : 'Upside down: off';
+  ui.rotate.classList.toggle('on', upsideDown);
+  const sender = call?.peerConnection?.getSenders().find((s) => s.track?.kind === 'video' || s.track === null);
+  if (sender) await sender.replaceTrack(stream.getVideoTracks()[0]);
+}
+
 function showPreview(s) {
   ui.preview.srcObject = s;
   ui.preview.classList.toggle('mirror', facing === 'user');
@@ -91,8 +151,9 @@ async function connect() {
     if (!stream) {
       setStatus('Camera…');
       setCard('Phone camera', 'Allow camera access to use this phone as the game camera.');
-      stream = await getCamera();
-      showPreview(stream);
+      camStream = await getCamera();
+      await updateOutput();
+      ui.rotate.classList.remove('hidden');
     }
     keepAwake();
 
@@ -191,16 +252,25 @@ ui.flip.addEventListener('click', async () => {
   const prev = facing;
   facing = facing === 'user' ? 'environment' : 'user';
   try {
-    stream?.getTracks().forEach((t) => t.stop());
-    stream = await getCamera();
-    showPreview(stream);
-    const track = stream.getVideoTracks()[0];
-    const sender = call?.peerConnection?.getSenders().find((s) => s.track?.kind === 'video' || s.track === null);
-    if (sender) await sender.replaceTrack(track);
+    camStream?.getTracks().forEach((t) => t.stop());
+    camStream = await getCamera();
+    await updateOutput();
   } catch (err) {
     console.error(err);
     facing = prev;
     setCard('Could not switch camera', err?.message || String(err));
+  }
+});
+
+ui.rotate.addEventListener('click', async () => {
+  upsideDown = !upsideDown;
+  try { localStorage.setItem('phonecam.upsideDown', upsideDown ? '1' : '0'); } catch {}
+  try {
+    if (camStream) await updateOutput();
+    else ui.rotate.textContent = upsideDown ? 'Upside down: on' : 'Upside down: off';
+  } catch (err) {
+    console.error(err);
+    setCard('Could not rotate', err?.message || String(err));
   }
 });
 
