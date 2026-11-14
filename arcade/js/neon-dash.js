@@ -4,6 +4,7 @@
 import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs';
 import { createCamera } from './camera.js';
 import { livesPicker, heartsText } from './lives.js';
+import { sfx, unlock, startMusic, stopMusic, soundButton } from './sound.js';
 
 const WASM_PATH = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm';
 const MODEL_URL =
@@ -26,6 +27,7 @@ const POSE_SMOOTH = 0.5;   // 0..1, how much of each new pose frame to take (low
 const ENABLE_JUMP = false; // jumping is switched off for now (no hurdles, no high coins)
 const JUMP_RISE = 0.14;    // hip rise (in torso lengths) that counts as a jump
 const DUCK_DROP = 0.30;    // head drop (in torso lengths) that counts as a squat
+const LOST_GRACE = 1.2;    // seconds tracking may drop out before the game pauses
 const WINDOW = 0.22;       // seconds of leeway around each hurdle/bar
 const SPAWN_Z = 80;        // how far ahead (world units) obstacles appear
 const LANE_W = 2;          // world units between lane centers
@@ -120,7 +122,10 @@ async function tryStart() {
   newGame();
 }
 
+soundButton(document.getElementById('sound'));
+
 startBtn.addEventListener('click', async () => {
+  unlock(); // browsers only allow sound after a click
   startBtn.disabled = true;
   try {
     await tryStart();
@@ -137,7 +142,8 @@ startBtn.addEventListener('click', async () => {
 
 // ---------- game flow ----------
 
-function setState(s) { state = s; stateTime = 0; }
+let lastTick = -1;
+function setState(s) { state = s; stateTime = 0; lastTick = -1; }
 
 function newGame() {
   score = 0; bonus = 0; coins = 0; maxLives = getMaxLives(); lives = maxLives; invul = 0; shake = 0; flash = 0;
@@ -156,6 +162,8 @@ function newGame() {
 
 function gameOver() {
   setState('over');
+  stopMusic();
+  sfx.over();
   let best = score;
   try { best = Math.max(score, Number(localStorage.getItem(BEST_KEY)) || 0); localStorage.setItem(BEST_KEY, best); } catch {}
   setTimeout(() => {
@@ -200,7 +208,12 @@ function track(now) {
   const hip = mid(pose[L_HIP], pose[R_HIP]);
   const sh = mid(pose[L_SH], pose[R_SH]);
   m = {
+    // Whole body in view: needed once, to learn your standing pose.
     visible: KEY_POINTS.every((i) => pose[i].v > 0.5 && pose[i].inFrame),
+    // Enough to keep playing: shoulders and hips. Squatting or sitting often hides
+    // the ankles and knees for a moment, which shouldn't pause the game.
+    present: [L_SH, R_SH, L_HIP, R_HIP].every((i) => pose[i].v > 0.35),
+    shY: sh.y,
     hipX: hip.x,
     hipY: hip.y,
     noseY: pose[NOSE].y,
@@ -210,19 +223,24 @@ function track(now) {
     wristY: Math.max(pose[L_WR].y, pose[R_WR].y), // the lower of the two wrists
   };
 
-  if (!base || !m.visible) return;
+  if (!base || !m.present) return;
 
   // Lanes, with hysteresis so you don't flicker at the edges. bodyX is the
   // continuous position (in lanes) that the avatar follows smoothly.
   const off = (m.hipX - base.hipX) / base.shoulderW;
   bodyX = Math.max(-1.3, Math.min(1.3, off / LANE_STEP));
+  const prevLane = lane;
   if (lane === 0) lane = off > LANE_ENTER ? 1 : off < -LANE_ENTER ? -1 : 0;
   else if (lane === 1) lane = off < -LANE_ENTER ? -1 : off < LANE_EXIT ? 0 : 1;
   else lane = off > LANE_ENTER ? 1 : off > -LANE_EXIT ? 0 : -1;
 
   const bothArmsUp = m.wristY < m.noseY - base.torso * 0.15; // accessible alternative to jumping
   jumping = ENABLE_JUMP && (base.hipY - m.hipY > base.torso * JUMP_RISE || bothArmsUp);
-  ducking = !jumping && m.noseY - base.noseY > base.torso * DUCK_DROP;
+  if (lane !== prevLane && state === 'play') sfx.lane();
+  // Duck = head or shoulders drop (whichever drops more), with hysteresis so a
+  // low squat or sitting stays "ducking" even if the head point wobbles.
+  const drop = Math.max(m.noseY - base.noseY, m.shY - base.shY) / base.torso;
+  ducking = !jumping && (ducking ? drop > DUCK_DROP * 0.6 : drop > DUCK_DROP);
 }
 
 // ---------- world ----------
@@ -261,6 +279,7 @@ function coinLine(l, z, n, high) {
 function hurt(text) {
   if (invul > 0) return;
   lives -= 1;
+  sfx.hit();
   invul = 1.6; shake = 0.4; flash = 0.5;
   effects.push({ text, color: COLORS.red, t: 0, life: 1, x: laneVis, h: 2.4 });
   updateHud();
@@ -288,7 +307,7 @@ function update(dt) {
     if (stateTime > 1.5) {
       const avg = (k) => calib.reduce((s, c) => s + c[k], 0) / calib.length;
       base = {
-        hipX: avg('hipX'), hipY: avg('hipY'), noseY: avg('noseY'), ankleY: avg('ankleY'),
+        hipX: avg('hipX'), hipY: avg('hipY'), noseY: avg('noseY'), ankleY: avg('ankleY'), shY: avg('shY'),
         shoulderW: avg('shoulderW'), torso: avg('torso'),
       };
       setState('countdown');
@@ -296,14 +315,18 @@ function update(dt) {
     return;
   }
   if (state === 'countdown') {
-    if (stateTime >= 3) { setState('play'); speed = 14; nextRowIn = 10; }
+    const n = Math.floor(stateTime);
+    if (n !== lastTick && n < 3) { lastTick = n; sfx.tick(); }
+    if (stateTime >= 3) { setState('play'); speed = 14; nextRowIn = 10; sfx.go(); startMusic('neon'); }
     return;
   }
   if (state !== 'play') return;
 
-  // Pause while the player is out of view.
-  if (!m?.visible) { lostFor += dt; return; }
-  lostFor = 0;
+  // Pause only if the player has been out of view for a while.
+  if (!m?.present) {
+    lostFor += dt;
+    if (lostFor > LOST_GRACE) return;
+  } else lostFor = 0;
   gt += dt;
 
   speed = 14 + Math.min(gt, 150) * 0.14; // world units / second, ramps up
@@ -321,7 +344,7 @@ function update(dt) {
     if (o.done) continue;
     if (o.kind === 'coin') {
       if (Math.abs(o.z) < 1.2 && lane === o.lane && (!o.high || jumping)) {
-        o.done = true; o.taken = true; coins += 1; bonus += 10;
+        o.done = true; o.taken = true; coins += 1; bonus += 10; sfx.pickup();
         effects.push({ text: '+10', color: COLORS.yellow, t: 0, life: 0.6, x: o.lane, h: o.high ? 2.6 : 1.8 });
       } else if (o.z < -1.2) o.done = true;
     } else if (o.kind === 'block') {
@@ -329,7 +352,7 @@ function update(dt) {
     } else {
       const ok = o.kind === 'hurdle' ? jumping : ducking;
       if (Math.abs(o.z) < win && ok) {
-        o.done = true; o.cleared = true; bonus += 25;
+        o.done = true; o.cleared = true; bonus += 25; sfx.cleared();
         effects.push({ text: o.kind === 'hurdle' ? 'Nice jump! +25' : 'Limbo! +25', color: COLORS.ok, t: 0, life: 0.9, x: 0, h: 2.8 });
       } else if (o.z < -win) {
         o.done = true;
@@ -730,7 +753,7 @@ function drawBanner() {
   if (state === 'frame') banner('Step into view', 'Head to feet in the camera picture (top right)');
   else if (state === 'calibrate') banner('Hold still…', 'Stand in the middle — this is your center lane', COLORS.cyan);
   else if (state === 'countdown') banner(String(3 - Math.floor(stateTime)), 'Step sideways to switch lanes!');
-  else if (state === 'play' && lostFor > 0.3) banner('Paused', 'Step back into view to keep running');
+  else if (state === 'play' && lostFor > LOST_GRACE) banner('Paused', 'Step back into view to keep running');
   else if (state === 'play' && gt < 1.5) banner('RUN!', null, COLORS.ok);
   else if (state === 'play' && squatSoon()) banner('SQUAT!', null, Math.floor(gt * 6) % 2 ? COLORS.magenta : '#fff');
   else if (state === 'over') banner('Game over', `Score: ${score}`, COLORS.red);

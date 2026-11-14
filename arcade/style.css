@@ -159,3 +159,20 @@ html, body {
 .pup-theme .other-game { color: #1d3557; }
 .pup-theme #hud { color: #fff; -webkit-text-stroke: 1px #1d3557; paint-order: stroke fill; font-family: "Baloo 2", system-ui, sans-serif; }
 .pup-theme .body-hud #lives { color: #ff5a5f; }
+
+/* Sound on/off button (Neon Dash, Pup Rescue Run) */
+.sound-btn {
+  position: fixed;
+  left: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 5;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
