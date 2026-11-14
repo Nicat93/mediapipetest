@@ -47,9 +47,11 @@ Made for a 4-year-old: no reading, no timers, no way to lose.
 
 With the camera, the middle part of the image is mapped to the whole screen so small arms reach every corner,
 and both hands can be used. Making a fist over a food grabs it at once; opening the hand lets go (over the pot
-it goes in, anywhere else it goes back to the shelf). Children who can't make a fist yet can hold an open hand
-over a food for about half a second instead; that food drops into the pot by itself. Buttons press with a fist,
-or by hovering about a second. Grown-ups can still help with the mouse or touch at the same time.
+it goes in, anywhere else it goes back to the shelf). Buttons press with a fist, or by hovering about a second.
+Two switches under **Settings** on the start screen (both on by default, remembered):
+- *Auto grab*: holding an open hand over a food for about half a second picks it up too.
+- *Auto release*: food drops into the pot as soon as it reaches it. When off, a fist must open over the pot,
+  and food picked up by hovering goes in after holding still over the pot for about half a second.
 To use a phone as the camera, open **Camera** on the start screen, pick *Phone (Wi‑Fi)* and scan the QR code
 (it uses the arcade's phone page, `arcade/phone.html`); the game starts as soon as the phone connects.
 

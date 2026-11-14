@@ -47,6 +47,21 @@ const RECIPES = [
 const PRAISE = ['Yummy!', 'Great job!', 'Well done!', 'Nice!', 'Super!', 'Mmm!'];
 const GRAB_TIME = 0.45; // seconds a hand hovers over food to pick it up
 const BUTTON_TIME = 1.0; // seconds a hand hovers over a button to press it
+// Grown-up settings (start screen): auto grab = hovering an open hand picks food up;
+// auto release = food goes in as soon as it reaches the pot. A fist always grabs and
+// opening the hand always lets go.
+const settings = {};
+for (const [key, id] of [['autoGrab', 'opt-autograb'], ['autoRelease', 'opt-autorelease']]) {
+  const box = $(id);
+  const store = `littlechef.${key}`;
+  let v = true;
+  try { v = localStorage.getItem(store) !== '0'; } catch {}
+  settings[key] = box.checked = v;
+  box.addEventListener('change', () => {
+    settings[key] = box.checked;
+    try { localStorage.setItem(store, box.checked ? '1' : '0'); } catch {}
+  });
+}
 const RELEASE_TIME = 0.15; // an opened hand must stay open this long to let go (ignores flicker)
 const COOK_WORK = 5; // how many dish-widths of waving/rubbing cooks the dish
 
@@ -516,25 +531,32 @@ function updateHands(dt, now) {
 
     // Grab gesture: close the hand (make a fist) over food to pick it up, open it to
     // let go. Food let go over the pot goes in; anywhere else it goes back to the shelf.
-    // Hovering still works too (for small hands that don't close well): food picked
-    // up that way drops into the pot by itself.
+    // Auto grab: hovering an open hand over food picks it up too. Auto release: food
+    // goes in as soon as it reaches the pot; without it, hover-picked food goes in
+    // after holding still over the pot.
     const closing = c.fist && !a.wasFist;
     a.wasFist = c.fist;
     if (a.held) {
       a.held.el.style.transform = `translate(${a.x}px, ${a.y - 34}px)`; // food sits on top of the fist
+      if (closing) a.grabbed = true; // hover-picked food held in a fist now lets go when the hand opens
       a.openT = c.fist ? 0 : a.openT + dt;
-      if (a.grabbed) {
-        if (a.openT >= RELEASE_TIME) {
-          if (overDish(a.x, a.y, 1.1)) tryAdd(a.held);
-          else returnToTile(a.held);
-          a.held = null;
-          a.grabbed = false;
-          a.block = null;
-        }
-      } else if (overDish(a.x, a.y, 0.95)) {
-        tryAdd(a.held);
+      const overPot = overDish(a.x, a.y, a.grabbed ? 1.1 : 0.95);
+      let release = false;
+      if (settings.autoRelease && overDish(a.x, a.y, 0.95)) release = true;
+      else if (a.grabbed) release = a.openT >= RELEASE_TIME;
+      else if (overPot) {
+        // picked up by hovering, no auto release: hold still over the pot to drop it
+        a.dwell += dt;
+        if (a.dwell >= GRAB_TIME) release = true;
+      } else a.dwell = 0;
+      a.ring.style.strokeDasharray = `${!a.grabbed && !settings.autoRelease && overPot ? ((a.dwell / GRAB_TIME) * 100).toFixed(1) : 0} 100`;
+      if (release) {
+        if (overPot || overDish(a.x, a.y, 0.95)) tryAdd(a.held);
+        else returnToTile(a.held);
         a.held = null;
+        a.grabbed = false;
         a.block = null;
+        a.dwell = 0;
       }
     } else {
       let target = null;
@@ -555,7 +577,8 @@ function updateHands(dt, now) {
         // moves onto one grabs it too (small children rarely open in between).
         const grab = c.fist && (closing || target.classList.contains('tile'));
         a.dwell += dt;
-        if (grab || (!c.fist && a.dwell >= need)) {
+        const hoverOk = !target.classList.contains('tile') || settings.autoGrab;
+        if (grab || (hoverOk && !c.fist && a.dwell >= need)) {
           a.dwell = 0;
           a.target = null;
           if (target.classList.contains('tile')) {
@@ -572,7 +595,7 @@ function updateHands(dt, now) {
           }
         }
       }
-      a.ring.style.strokeDasharray = `${target && !c.fist ? ((a.dwell / need) * 100).toFixed(1) : 0} 100`;
+      a.ring.style.strokeDasharray = `${target && !c.fist && (settings.autoGrab || !target.classList.contains('tile')) ? ((a.dwell / need) * 100).toFixed(1) : 0} 100`;
     }
     a.el.classList.toggle('holding', !!a.held);
     a.icon.textContent = a.held || c.fist ? '✊' : '✋';

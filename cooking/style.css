@@ -89,7 +89,11 @@ button.big small { font-size: 14px; font-weight: 700; opacity: 0.9; }
 .fine { font-size: 14px; color: var(--muted); max-width: 560px; line-height: 1.45; font-weight: 700; }
 .fine a { color: var(--accent-dark); }
 
-/* camera picker (grown-ups) */
+/* settings (grown-ups) */
+#start .opts { display: flex; flex-direction: column; gap: 8px; margin: 10px auto 0; text-align: left; max-width: 440px; }
+#start .opts label { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; color: var(--ink); cursor: pointer; }
+#start .opts input { width: 22px; height: 22px; accent-color: var(--accent); grid-row: span 2; margin: 0; }
+#start .opts small { grid-column: 2; color: var(--muted); font-size: 13px; }
 #start details.grown-ups { font-size: 15px; color: var(--muted); max-width: 560px; margin-top: 4px; }
 #start details.grown-ups summary { cursor: pointer; color: var(--accent-dark); }
 .cam-pick { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; }
