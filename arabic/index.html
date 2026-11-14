@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="az">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ərəbcə Rəqəmlər</title>
+  <meta name="description" content="Arabic numbers 1–10 for small Azerbaijani-speaking children: count fun objects and write the digits in the air with a fist, with a finger or a mouse.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Noto+Naskh+Arabic:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <!-- ============ start ============ -->
+  <section id="start" class="screen">
+    <div class="logo" aria-hidden="true"><span lang="ar">١٢٣</span></div>
+    <h1>Ərəbcə Rəqəmlər</h1>
+    <p class="tag">Gəl ərəbcə saymağı öyrənək!</p>
+    <div class="start-buttons">
+      <button id="play-hands" class="big"><span class="ico" aria-hidden="true">✊</span>Əllə oyna<small>kamera ilə</small></button>
+      <button id="play-touch" class="big alt"><span class="ico" aria-hidden="true">👆</span>Toxunaraq oyna<small>barmaq və ya siçan</small></button>
+    </div>
+    <label class="cam-pick">Kamera
+      <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
+    </label>
+    <div id="link" hidden>
+      <span class="state"></span>
+      <span class="url"></span>
+    </div>
+    <p class="msg" id="start-msg" role="status"></p>
+    <details class="grown-ups">
+      <summary>Böyüklər üçün</summary>
+      <p>
+        Uşaq 1-dən 10-a qədər ərəbcə rəqəmləri öyrənir: əşyaları sayır, rəqəmi yazır, sonra “Neçədir?” oyununu oynayır.
+        Kamera ilə yazmaq üçün yumruğu sıxmaq lazımdır: yumruq — qələm kağızda, açıq əl — qələm havada.
+        Ərəbcə sözlər cihazın ərəb səsi ilə oxunur (Edge, Android və iPhone-da adətən var).
+        Video heç yerə göndərilmir.
+      </p>
+      <label class="opt"><input type="checkbox" id="opt-voice"> Azərbaycanca göstərişləri səsləndir <small>cihazda azərbaycan və ya türk səsi varsa</small></label>
+      <p id="voice-info" class="voice-info"></p>
+      <p><a href="../">Bütün oyunlar · All games</a></p>
+    </details>
+  </section>
+
+  <!-- ============ game ============ -->
+  <section id="game" class="screen hidden">
+    <header>
+      <button id="btn-home" class="tool hb" data-dwell="1.4" aria-label="Geri">🏠</button>
+      <div id="title" aria-live="polite"></div>
+      <button id="btn-sound" class="tool" aria-label="Səs">🔊</button>
+    </header>
+
+    <!-- number map -->
+    <main id="map" class="view">
+      <div id="nums"></div>
+      <button id="btn-quiz" class="pill hb"><span aria-hidden="true">🎲</span> Neçədir? oyunu</button>
+    </main>
+
+    <!-- count the objects -->
+    <main id="learn" class="view hidden">
+      <div class="numcard">
+        <span class="digit" lang="ar"></span>
+        <span class="words"><span class="ar" lang="ar"></span><span class="tr"></span></span>
+        <button id="btn-hear" class="tool hb" aria-label="Yenə dinlə">🔈</button>
+      </div>
+      <div id="objects" class="objects"></div>
+      <div class="actions">
+        <button id="btn-write" class="pill go hb hidden">✏️ İndi yaz!</button>
+      </div>
+    </main>
+
+    <!-- write the digit -->
+    <main id="write" class="view hidden">
+      <div class="write-row">
+        <div class="side">
+          <span class="digit small" lang="ar"></span>
+          <button id="btn-hear2" class="tool hb" aria-label="Yenə dinlə">🔈</button>
+          <button id="btn-clear" class="tool hb" aria-label="Sil">🧽</button>
+        </div>
+        <div id="pad"><canvas id="pad-canvas"></canvas><div id="pad-hint"></div></div>
+        <div class="side">
+          <button id="btn-next" class="tool go hb hidden" aria-label="Sonrakı">▶</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- how many? -->
+    <main id="quiz" class="view hidden">
+      <div id="quiz-objects" class="objects"></div>
+      <div id="choices"></div>
+    </main>
+  </section>
+
+  <div id="cam" class="hidden">
+    <video id="cam-video" playsinline muted></video>
+    <canvas id="cam-canvas"></canvas>
+    <div id="cam-badge">✋?</div>
+  </div>
+
+  <div id="loading" class="hidden" role="status"><div class="spinner"></div><p id="loading-text">Hazırlanır…</p></div>
+  <div id="fx" aria-hidden="true"></div>
+  <div id="cursors" aria-hidden="true"></div>
+</body>
+</html>
