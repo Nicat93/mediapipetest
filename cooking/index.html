@@ -20,23 +20,23 @@
       <button id="play-hands" class="big"><span class="ico" aria-hidden="true">✋</span>Play with hands<small>uses the camera</small></button>
       <button id="play-touch" class="big alt"><span class="ico" aria-hidden="true">👆</span>Play with touch<small>or a mouse</small></button>
     </div>
+    <label class="cam-pick">Camera
+      <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
+    </label>
+    <div id="link" hidden>
+      <span class="state"></span>
+      <span class="url"></span>
+    </div>
     <p class="msg" id="start-msg" role="status"></p>
     <p class="fine">
       For grown-ups: the game talks, so turn the sound on. With the camera, your child grabs food by making a fist over it
-      (or just holding a hand over it), carries it to the pot and opens the hand to drop it in. The video isn’t uploaded anywhere. To use a phone as the camera, or to change how grabbing works, open “Settings” below. <a href="../">All games</a>
+      (or just holding a hand over it), carries it to the pot and opens the hand to drop it in. The video isn’t uploaded anywhere. To use a phone as the camera, pick “Phone (Wi‑Fi)” above. To change how grabbing works, open “Settings” below. <a href="../">All games</a>
     </p>
     <details class="grown-ups">
       <summary>Settings</summary>
       <div class="opts">
         <label><input type="checkbox" id="opt-autograb"> Auto grab <small>hold an open hand over food to pick it up (a fist always works)</small></label>
         <label><input type="checkbox" id="opt-autorelease"> Auto release <small>food drops into the pot as soon as it reaches it (otherwise open the hand, or hold still over the pot)</small></label>
-      </div>
-      <label class="cam-pick">Camera for “Play with hands”
-        <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
-      </label>
-      <div id="link" hidden>
-        <span class="state"></span>
-        <span class="url"></span>
       </div>
     </details>
   </section>

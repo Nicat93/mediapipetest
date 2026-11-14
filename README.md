@@ -52,7 +52,7 @@ Two switches under **Settings** on the start screen (both on by default, remembe
 - *Auto grab*: holding an open hand over a food for about half a second picks it up too.
 - *Auto release*: food drops into the pot as soon as it reaches it. When off, a fist must open over the pot,
   and food picked up by hovering goes in after holding still over the pot for about half a second.
-To use a phone as the camera, open **Camera** on the start screen, pick *Phone (Wi‑Fi)* and scan the QR code
+To use a phone as the camera, use the **Camera** picker on the start screen, pick *Phone (Wi‑Fi)* and scan the QR code
 (it uses the arcade's phone page, `arcade/phone.html`); the game starts as soon as the phone connects.
 
 Files: `cooking/index.html`, `cooking/style.css`, `cooking/js/main.js` (game), `cooking/js/hands.js`

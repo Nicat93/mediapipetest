@@ -687,7 +687,6 @@ $('play-hands').addEventListener('click', async () => {
     if (!ready) {
       // Phone chosen but not connected yet: show the QR code and start once it connects.
       waitingForPhone = true;
-      document.querySelector('#start details.grown-ups').open = true;
       ui.startMsg.textContent = 'Waiting for the phone… Scan the QR code below with it.';
       $('link').scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
