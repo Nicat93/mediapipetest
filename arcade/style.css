@@ -152,6 +152,14 @@ html, body {
 .pup-pick button[aria-pressed="true"] { border-color: #ff8c42; background: #fff; transform: scale(1.06); box-shadow: 0 6px 18px rgba(29, 53, 87, 0.25); }
 .pup-pick button[data-pup="fire"][aria-pressed="true"] { border-color: #e63946; }
 .pup-pick button[data-pup="police"][aria-pressed="true"] { border-color: #3a86ff; }
+.pup-pick button[data-pup="pilot"][aria-pressed="true"] { border-color: #ff6fae; }
+.pup-pick button[data-pup="builder"][aria-pressed="true"] { border-color: #f2b600; }
+.pup-pick button[data-pup="water"][aria-pressed="true"] { border-color: #e8620c; }
+@media (max-width: 700px) {
+  .pup-pick { gap: 8px; }
+  .pup-pick button { font-size: 16px; padding: 6px 8px 4px; }
+  .pup-pick button canvas { width: 84px; height: 105px; }
+}
 .grown-ups { max-width: 460px; font-size: 16px; }
 .grown-ups summary { cursor: pointer; opacity: 0.8; }
 .grown-ups[open] { display: flex; flex-direction: column; gap: 12px; align-items: center; }

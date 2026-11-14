@@ -75,7 +75,7 @@ let objects = [], effects = [], decorIn = 0;
 
 // Pup choice (buttons on the start screen, each with a little preview of the pup)
 let pupKind = 'fire';
-try { if (localStorage.getItem(PUP_KEY) === 'police') pupKind = 'police'; } catch {}
+try { const saved = localStorage.getItem(PUP_KEY); if (saved && saved in PUPS) pupKind = saved; } catch {}
 const pupButtons = [...document.querySelectorAll('.pup-pick button')];
 function choosePup(kind) {
   pupKind = kind;
@@ -795,21 +795,10 @@ function drawDecor(o) {
 }
 
 // ---------- the pups ----------
-// Two original pups: a firefighter corgi and a police beagle, drawn as real
+// Five original rescue pups (fire corgi, police beagle, pilot fluffy pup,
+// builder schnauzer, water collie), drawn as real
 // four-legged dogs. Your body only steers them (lane, lean, duck).
 
-export const PUPS = {
-  fire: {
-    name: 'Fire pup',
-    fur: '#ec9a45', light: '#fff4e2', ear: '#d9822f', earInner: '#ffc2b3', eye: '#4a2c17',
-    coat: '#ffc83d', coatDark: '#c99100', trim: '#e8eef5', collar: '#e63946',
-  },
-  police: {
-    name: 'Police pup',
-    fur: '#c27c3a', light: '#fffaf2', ear: '#5e3518', earInner: '#5e3518', eye: '#2d1a0e',
-    coat: '#3d7bf0', coatDark: '#1f4fb0', trim: '#ffd43b', collar: '#1f3d8a',
-  },
-};
 
 function star(c, x, y, r, fill, stroke) {
   c.beginPath();
@@ -848,66 +837,254 @@ function tube(c, a, b, color, w, ow) {
   c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
 }
 
-/** Back of the head with ears and hat; origin = head center. */
-function drawHeadBack(c, k, kind, R, u, ow, flap) {
-  if (kind === 'fire') {
-    for (const s of [-1, 1]) { // upright corgi ears
+export const PUPS = {
+  fire: {
+    name: 'Fire pup', ears: 'up', hat: 'helmet', vest: 'stripes', mark: 'dot',
+    fur: '#ec9a45', light: '#fff4e2', ear: '#d9822f', earInner: '#ffc2b3', eye: '#4a2c17', brow: '#9a4d12',
+    coat: '#ffc83d', coatDark: '#c99100', trim: '#e8eef5', collar: '#e63946',
+    hatMain: '#e63946', hatDark: '#c1121f', pack: '#e63946',
+  },
+  police: {
+    name: 'Police pup', ears: 'flop', hat: 'cap', vest: 'police', mark: 'star',
+    fur: '#c27c3a', light: '#fffaf2', ear: '#5e3518', earInner: '#5e3518', eye: '#2d1a0e', brow: '#3a2010',
+    coat: '#3d7bf0', coatDark: '#1f4fb0', trim: '#ffd43b', collar: '#1f3d8a',
+    hatMain: '#1f3d8a', hatDark: '#14275a', pack: '#24489e',
+  },
+  pilot: {
+    name: 'Pilot pup', ears: 'fluffy', hat: 'aviator', vest: 'pilot', mark: 'wings',
+    fur: '#fbf6ef', light: '#ffffff', ear: '#f1e7dc', earInner: '#ffc2d4', eye: '#3a2216', brow: '#b9a58f',
+    coat: '#ff6fae', coatDark: '#d9488a', trim: '#ffffff', collar: '#c2185b',
+    hatMain: '#ff8cc0', hatDark: '#e0619c', pack: '#e0498d',
+  },
+  builder: {
+    name: 'Builder pup', ears: 'fold', hat: 'hardhat', vest: 'hivis', mark: 'wrench',
+    fur: '#9aa3ad', light: '#eef1f4', ear: '#6f7882', earInner: '#6f7882', eye: '#2a1d14', brow: '#eef1f4', beard: true,
+    coat: '#ffd21f', coatDark: '#d4a900', trim: '#d9dee5', collar: '#5b6470',
+    hatMain: '#ffd21f', hatDark: '#e0b400', pack: '#f2b600',
+  },
+  water: {
+    name: 'Water pup', ears: 'fold', hat: 'visor', vest: 'life', mark: 'cross',
+    fur: '#2e2f38', light: '#ffffff', ear: '#2e2f38', earInner: '#2e2f38', eye: '#3a2216', brow: '#8a8f9c',
+    coat: '#e8620c', coatDark: '#b84a05', trim: '#ffffff', collar: '#1f6fb2',
+    hatMain: '#e8620c', hatDark: '#b84a05', pack: '#d45608',
+  },
+};
+
+// ---- shared pieces (used by the front view and the back view) ----
+
+/** Ears that sit behind the head (upright / fluffy). */
+function earsBehind(c, k, R, ow, front) {
+  if (k.ears === 'up') {
+    for (const s of [-1, 1]) {
       c.beginPath();
       c.moveTo(s * R * 0.2, -R * 0.7);
       c.quadraticCurveTo(s * R * 0.55, -R * 1.65, s * R * 0.98, -R * 1.42);
       c.quadraticCurveTo(s * R * 1.12, -R * 0.9, s * R * 0.95, -R * 0.3);
       c.closePath();
       blob(c, k.ear, ow);
+      if (front) {
+        c.beginPath();
+        c.moveTo(s * R * 0.4, -R * 0.68);
+        c.quadraticCurveTo(s * R * 0.65, -R * 1.38, s * R * 0.9, -R * 1.25);
+        c.quadraticCurveTo(s * R * 0.98, -R * 0.85, s * R * 0.86, -R * 0.45);
+        c.closePath();
+        c.fillStyle = k.earInner; c.fill();
+      }
+    }
+  } else if (k.ears === 'fluffy') {
+    for (const s of [-1, 1]) {
+      c.beginPath();
+      c.moveTo(s * R * 0.3, -R * 0.78);
+      c.quadraticCurveTo(s * R * 0.6, -R * 1.42, s * R * 0.82, -R * 1.2);
+      c.quadraticCurveTo(s * R * 0.95, -R * 0.85, s * R * 0.92, -R * 0.45);
+      c.closePath();
+      blob(c, k.ear, ow);
+      if (front) {
+        c.beginPath();
+        c.moveTo(s * R * 0.45, -R * 0.74); c.quadraticCurveTo(s * R * 0.64, -R * 1.18, s * R * 0.78, -R * 1.05);
+        c.lineTo(s * R * 0.8, -R * 0.6); c.closePath();
+        c.fillStyle = k.earInner; c.fill();
+      }
+    }
+    // fluffy cheek tufts
+    for (const s of [-1, 1]) {
+      c.beginPath();
+      c.moveTo(s * R * 0.9, -R * 0.2);
+      c.lineTo(s * R * 1.22, -R * 0.02); c.lineTo(s * R * 1.0, R * 0.12);
+      c.lineTo(s * R * 1.18, R * 0.32); c.lineTo(s * R * 0.85, R * 0.45);
+      c.closePath();
+      blob(c, k.fur, ow);
     }
   }
-  c.beginPath(); c.ellipse(0, 0, R * 1.04, R * 0.98, 0, 0, Math.PI * 2);
-  blob(c, k.fur, ow);
-  gloss(c, -R * 0.45, -R * 0.35, R * 0.18, R * 0.32, 0.5, 0.3);
-  if (kind === 'police') {
-    for (const s of [-1, 1]) { // floppy beagle ears
+}
+
+/** Ears that hang over the head sides (floppy / folded). */
+function earsFront(c, k, R, ow, flap) {
+  if (k.ears === 'flop') {
+    for (const s of [-1, 1]) {
       c.save();
-      c.translate(s * R * 0.88, -R * 0.35);
-      c.rotate(s * (-0.2 - flap * 0.3));
+      c.translate(s * R * 0.86, -R * 0.35);
+      c.rotate(s * (-0.22 - flap * 0.3));
       c.beginPath(); c.ellipse(s * R * 0.08, R * 0.55, R * 0.3, R * 0.68, 0, 0, Math.PI * 2);
       blob(c, k.ear, ow);
       c.restore();
     }
-  }
-  if (kind === 'fire') {
-    c.beginPath(); c.ellipse(0, -R * 0.5, R * 0.84, R * 0.64, 0, Math.PI, 0); c.closePath();
-    blob(c, '#e63946', ow);
-    c.strokeStyle = '#ffd43b'; c.lineWidth = 0.15 * R;
-    c.beginPath(); c.moveTo(0, -R * 1.12); c.lineTo(0, -R * 0.55); c.stroke();
-    c.beginPath();
-    c.moveTo(-R * 1.05, -R * 0.52);
-    c.quadraticCurveTo(0, -R * 0.3, R * 1.05, -R * 0.52);
-    c.quadraticCurveTo(R * 0.8, -R * 0.05, 0, -R * 0.02);
-    c.quadraticCurveTo(-R * 0.8, -R * 0.05, -R * 1.05, -R * 0.52);
-    blob(c, '#c1121f', ow);
-    gloss(c, -R * 0.4, -R * 0.85, R * 0.2, R * 0.1, -0.4, 0.5);
-  } else {
-    c.beginPath();
-    c.moveTo(-R * 0.66, -R * 0.58); c.lineTo(-R * 0.82, -R * 1.1);
-    c.quadraticCurveTo(0, -R * 1.42, R * 0.82, -R * 1.1); c.lineTo(R * 0.66, -R * 0.58);
-    c.closePath();
-    blob(c, '#1f3d8a', ow);
-    c.beginPath(); c.rect(-R * 0.68, -R * 0.72, R * 1.36, R * 0.17);
-    blob(c, '#14275a', ow * 0.7);
-    gloss(c, -R * 0.35, -R * 1.05, R * 0.2, R * 0.08, -0.2, 0.4);
+  } else if (k.ears === 'fold') {
+    // triangular ears with the tips folded forward
+    for (const s of [-1, 1]) {
+      c.save();
+      c.translate(s * R * 0.62, -R * 0.78);
+      c.rotate(s * (0.15 + flap * 0.25));
+      c.beginPath();
+      c.moveTo(-s * R * 0.25, 0); c.lineTo(s * R * 0.32, -R * 0.08);
+      c.quadraticCurveTo(s * R * 0.42, R * 0.3, s * R * 0.2, R * 0.48);
+      c.closePath();
+      blob(c, k.ear, ow);
+      c.restore();
+    }
   }
 }
 
-/** Coat (fire) or vest (police) details, clipped to the current path. */
+/** Hat seen from the front (back = false) or from behind (back = true); origin = head center. */
+function drawHat(c, k, R, ow, back) {
+  const glossy = (x, y, rx, ry, r) => gloss(c, x, y, rx, ry, r, 0.45);
+  if (k.hat === 'helmet') {
+    c.beginPath(); c.ellipse(0, -R * 0.52, R * 0.84, R * 0.64, 0, Math.PI, 0); c.closePath();
+    blob(c, k.hatMain, ow);
+    c.strokeStyle = '#ffd43b'; c.lineWidth = 0.13 * R;
+    c.beginPath(); c.moveTo(0, -R * 1.14); c.lineTo(0, -R * 0.58); c.stroke();
+    if (back) { // long back brim
+      c.beginPath();
+      c.moveTo(-R * 1.05, -R * 0.52);
+      c.quadraticCurveTo(0, -R * 0.3, R * 1.05, -R * 0.52);
+      c.quadraticCurveTo(R * 0.8, -R * 0.05, 0, -R * 0.02);
+      c.quadraticCurveTo(-R * 0.8, -R * 0.05, -R * 1.05, -R * 0.52);
+      blob(c, k.hatDark, ow);
+    } else {
+      c.beginPath(); c.ellipse(0, -R * 0.55, R * 1.08, R * 0.17, 0, 0, Math.PI * 2); blob(c, k.hatDark, ow);
+      c.beginPath(); c.roundRect(-R * 0.22, -R * 0.98, R * 0.44, R * 0.34, R * 0.08); blob(c, '#ffd43b', ow * 0.6);
+      c.fillStyle = k.hatMain; c.beginPath(); c.arc(0, -R * 0.81, R * 0.08, 0, Math.PI * 2); c.fill();
+    }
+    glossy(-R * 0.4, -R * 0.85, R * 0.2, R * 0.1, -0.4);
+  } else if (k.hat === 'cap') {
+    c.beginPath();
+    c.moveTo(-R * 0.64, -R * 0.6); c.lineTo(-R * 0.8, -R * 1.1);
+    c.quadraticCurveTo(0, -R * 1.42, R * 0.8, -R * 1.1); c.lineTo(R * 0.64, -R * 0.6);
+    c.closePath();
+    blob(c, k.hatMain, ow);
+    c.beginPath(); c.rect(-R * 0.66, -R * 0.73, R * 1.32, R * 0.16); blob(c, k.hatDark, ow * 0.7);
+    if (!back) {
+      c.beginPath(); c.ellipse(0, -R * 0.56, R * 0.66, R * 0.13, 0, 0, Math.PI); blob(c, '#111', ow * 0.7);
+      star(c, 0, -R * 0.98, R * 0.17, '#ffd43b', '#b8860b');
+    }
+    glossy(-R * 0.35, -R * 1.05, R * 0.2, R * 0.08, -0.2);
+  } else if (k.hat === 'aviator') {
+    // soft flying cap with ear flaps, goggles pushed up on the forehead
+    c.beginPath(); c.ellipse(0, -R * 0.42, R * 0.92, R * 0.72, 0, Math.PI, 0); c.closePath();
+    blob(c, k.hatMain, ow);
+    for (const s of [-1, 1]) {
+      c.beginPath(); c.roundRect(s * R * 0.92 - R * 0.17, -R * 0.5, R * 0.34, R * 0.55, R * 0.15);
+      blob(c, k.hatDark, ow);
+    }
+    c.strokeStyle = k.hatDark; c.lineWidth = 0.1 * R;
+    c.beginPath(); c.moveTo(-R * 0.6, -R * 0.75); c.quadraticCurveTo(0, -R * 1.25, R * 0.6, -R * 0.75); c.stroke();
+    // goggles strap + lenses
+    c.strokeStyle = '#5a3b2a'; c.lineWidth = 0.12 * R;
+    c.beginPath(); c.moveTo(-R * 0.9, -R * 0.72); c.quadraticCurveTo(0, -R * 0.62, R * 0.9, -R * 0.72); c.stroke();
+    if (!back) {
+      for (const s of [-1, 1]) {
+        c.beginPath(); c.arc(s * R * 0.27, -R * 0.7, R * 0.2, 0, Math.PI * 2); blob(c, '#c9a227', ow * 0.7);
+        c.beginPath(); c.arc(s * R * 0.27, -R * 0.7, R * 0.13, 0, Math.PI * 2); c.fillStyle = '#9fe0ff'; c.fill();
+        gloss(c, s * R * 0.27 - R * 0.04, -R * 0.75, R * 0.04, R * 0.06, 0.4, 0.8);
+      }
+    }
+    glossy(-R * 0.4, -R * 0.92, R * 0.2, R * 0.1, -0.4);
+  } else if (k.hat === 'hardhat') {
+    c.beginPath(); c.ellipse(0, -R * 0.55, R * 0.86, R * 0.66, 0, Math.PI, 0); c.closePath();
+    blob(c, k.hatMain, ow);
+    c.strokeStyle = k.hatDark; c.lineWidth = 0.14 * R;
+    c.beginPath(); c.moveTo(0, -R * 1.18); c.lineTo(0, -R * 0.6); c.stroke();
+    c.beginPath(); c.ellipse(0, -R * 0.55, R * (back ? 0.98 : 1.0), R * 0.13, 0, 0, Math.PI * 2); blob(c, k.hatDark, ow);
+    if (!back) { // short front peak
+      c.beginPath(); c.ellipse(0, -R * 0.5, R * 0.6, R * 0.14, 0, 0, Math.PI); blob(c, k.hatDark, ow);
+    }
+    glossy(-R * 0.4, -R * 0.88, R * 0.22, R * 0.1, -0.4);
+  } else if (k.hat === 'visor') {
+    // rescue cap: crown, front peak, white piping
+    c.beginPath(); c.ellipse(0, -R * 0.55, R * 0.82, R * 0.6, 0, Math.PI, 0); c.closePath();
+    blob(c, k.hatMain, ow);
+    c.strokeStyle = '#ffffff'; c.lineWidth = 0.08 * R;
+    c.beginPath(); c.moveTo(-R * 0.7, -R * 0.78); c.quadraticCurveTo(0, -R * 0.95, R * 0.7, -R * 0.78); c.stroke();
+    c.fillStyle = '#ffffff'; c.beginPath(); c.arc(0, -R * 1.15, R * 0.08, 0, Math.PI * 2); c.fill();
+    if (back) {
+      c.beginPath(); c.roundRect(-R * 0.3, -R * 0.62, R * 0.6, R * 0.12, R * 0.05); blob(c, k.hatDark, ow * 0.6);
+    } else {
+      c.beginPath(); c.ellipse(0, -R * 0.55, R * 0.85, R * 0.2, 0, 0, Math.PI); blob(c, k.hatDark, ow);
+    }
+    glossy(-R * 0.35, -R * 0.9, R * 0.2, R * 0.08, -0.3);
+  }
+}
+
+/** Little emblem: on the chest (front) or the backpack (back). */
+function drawMark(c, k, x, y, r) {
+  if (k.mark === 'star') star(c, x, y, r, '#ffd43b', '#b8860b');
+  else if (k.mark === 'dot') { c.fillStyle = '#ffd43b'; c.beginPath(); c.arc(x, y, r * 0.8, 0, Math.PI * 2); c.fill(); }
+  else if (k.mark === 'wings') {
+    c.fillStyle = '#ffffff'; c.strokeStyle = INK; c.lineWidth = Math.max(1, r * 0.12);
+    for (const s of [-1, 1]) {
+      c.beginPath();
+      c.moveTo(x, y); c.quadraticCurveTo(x + s * r * 1.1, y - r * 0.9, x + s * r * 1.9, y - r * 0.45);
+      c.quadraticCurveTo(x + s * r * 1.1, y + r * 0.2, x, y + r * 0.35);
+      c.closePath(); c.fill(); c.stroke();
+    }
+    c.fillStyle = '#ffd43b'; c.beginPath(); c.arc(x, y, r * 0.35, 0, Math.PI * 2); c.fill();
+  } else if (k.mark === 'wrench') {
+    c.save(); c.translate(x, y); c.rotate(-0.7);
+    c.fillStyle = '#e9edf2'; c.strokeStyle = INK; c.lineWidth = Math.max(1, r * 0.12);
+    c.beginPath(); c.roundRect(-r * 0.18, -r * 0.6, r * 0.36, r * 1.5, r * 0.1); c.fill(); c.stroke();
+    c.beginPath(); c.arc(0, -r * 0.75, r * 0.4, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = k.pack; c.beginPath(); c.rect(-r * 0.13, -r * 1.2, r * 0.26, r * 0.45); c.fill();
+    c.restore();
+  } else if (k.mark === 'cross') {
+    c.fillStyle = '#ffffff'; c.strokeStyle = INK; c.lineWidth = Math.max(1, r * 0.1);
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = '#e63946';
+    c.fillRect(x - r * 0.2, y - r * 0.65, r * 0.4, r * 1.3); c.fillRect(x - r * 0.65, y - r * 0.2, r * 1.3, r * 0.4);
+  }
+}
+
+/** Back of the head with ears and hat; origin = head center. */
+function drawHeadBack(c, k, kind, R, u, ow, flap) {
+  earsBehind(c, k, R, ow, false);
+  c.beginPath(); c.ellipse(0, 0, R * 1.04, R * 0.98, 0, 0, Math.PI * 2);
+  blob(c, k.fur, ow);
+  gloss(c, -R * 0.45, -R * 0.35, R * 0.18, R * 0.32, 0.5, 0.3);
+  earsFront(c, k, R, ow, flap);
+  drawHat(c, k, R, ow, true);
+}
+
+/** Coat / vest details, clipped to the current path. */
 function coatDetails(c, kind, k, u, ow, top, bottom) {
   c.save(); c.clip();
-  if (kind === 'fire') {
-    for (const t of [0.45, 0.75]) {
-      const yy = top + (bottom - top) * t;
-      c.fillStyle = k.trim; c.fillRect(-2 * u, yy - 0.035 * u, 4 * u, 0.07 * u);
-      c.strokeStyle = INK; c.lineWidth = ow * 0.4; c.strokeRect(-2 * u, yy - 0.035 * u, 4 * u, 0.07 * u);
+  const band = (t, h, color) => {
+    const yy = top + (bottom - top) * t;
+    c.fillStyle = color; c.fillRect(-2 * u, yy - h / 2, 4 * u, h);
+    c.strokeStyle = INK; c.lineWidth = ow * 0.4; c.strokeRect(-2 * u, yy - h / 2, 4 * u, h);
+  };
+  if (k.vest === 'stripes') { band(0.45, 0.07 * u, k.trim); band(0.75, 0.07 * u, k.trim); }
+  else if (k.vest === 'police') { c.fillStyle = k.trim; c.fillRect(-2 * u, bottom - 0.08 * u, 4 * u, 0.05 * u); }
+  else if (k.vest === 'pilot') { band(0.18, 0.08 * u, k.coatDark); band(0.88, 0.06 * u, k.trim); }
+  else if (k.vest === 'hivis') {
+    band(0.5, 0.08 * u, k.trim);
+    c.fillStyle = k.trim;
+    for (const s of [-1, 1]) c.fillRect(s * 0.14 * u - 0.035 * u, top - u, 0.07 * u, 2 * u);
+  } else if (k.vest === 'life') {
+    band(0.12, 0.07 * u, k.trim);
+    for (const t of [0.42, 0.72]) {
+      band(t, 0.05 * u, '#1b1b22');
+      c.fillStyle = '#c9d1d9';
+      c.fillRect(-0.05 * u, top + (bottom - top) * t - 0.04 * u, 0.1 * u, 0.08 * u);
     }
-  } else {
-    c.fillStyle = k.trim; c.fillRect(-2 * u, bottom - 0.08 * u, 4 * u, 0.05 * u);
   }
   c.restore();
 }
@@ -937,7 +1114,7 @@ function drawDogFront(c, x, y, u, kind, time = 0) {
   blob(c, k.coat, ow);
   c.beginPath(); c.ellipse(0, -0.55 * u, 0.33 * u, 0.42 * u, 0, 0, Math.PI * 2);
   coatDetails(c, kind, k, u, ow, -0.97 * u, -0.13 * u);
-  if (kind === 'police') star(c, 0.12 * u, -0.7 * u, 0.09 * u, k.trim, '#b8860b');
+  if (k.mark !== 'dot') drawMark(c, k, 0.12 * u, -0.7 * u, 0.08 * u);
   gloss(c, -0.15 * u, -0.75 * u, 0.05 * u, 0.12 * u, 0.3, 0.35);
   // Front legs
   for (const s of [-1, 1]) {
@@ -957,47 +1134,25 @@ function drawDogFront(c, x, y, u, kind, time = 0) {
 
 /** Face, ears and hat seen from the front; origin = head center. */
 function drawFace(c, k, kind, R, u, time, ol) {
-  if (kind === 'fire') {
-    // big upright corgi ears (behind the head)
-    for (const s of [-1, 1]) {
-      // wide, round-tipped corgi ears
-      c.beginPath();
-      c.moveTo(s * R * 0.2, -R * 0.7);
-      c.quadraticCurveTo(s * R * 0.55, -R * 1.65, s * R * 0.98, -R * 1.42);
-      c.quadraticCurveTo(s * R * 1.12, -R * 0.9, s * R * 0.95, -R * 0.3);
-      c.closePath();
-      outlined(k.ear, ol, Math.max(1.5, 0.03 * u), c);
-      c.beginPath();
-      c.moveTo(s * R * 0.4, -R * 0.68);
-      c.quadraticCurveTo(s * R * 0.65, -R * 1.38, s * R * 0.9, -R * 1.25);
-      c.quadraticCurveTo(s * R * 0.98, -R * 0.85, s * R * 0.86, -R * 0.45);
-      c.closePath();
-      c.fillStyle = k.earInner; c.fill();
-    }
-  }
-  // head
+  const ow = Math.max(1.5, 0.035 * u);
+  earsBehind(c, k, R, ow, true);
   c.beginPath();
   c.ellipse(0, 0, R * 1.05, R, 0, 0, Math.PI * 2);
-  outlined(k.fur, ol, Math.max(1.5, 0.035 * u), c);
-  // white blaze + muzzle
+  blob(c, k.fur, ow);
+  // light blaze + muzzle
   c.fillStyle = k.light;
   c.beginPath();
   c.moveTo(-R * 0.12, -R * 0.75); c.lineTo(R * 0.12, -R * 0.75); c.lineTo(R * 0.2, R * 0.1); c.lineTo(-R * 0.2, R * 0.1);
   c.fill();
   c.beginPath(); c.ellipse(0, R * 0.42, R * 0.62, R * 0.46, 0, 0, Math.PI * 2); c.fill();
-  c.strokeStyle = 'rgba(59,42,30,0.35)'; c.lineWidth = Math.max(1, 0.02 * u); c.stroke();
-  if (kind === 'police') {
-    // long floppy beagle ears (in front of the head sides)
-    for (const s of [-1, 1]) {
-      c.save();
-      c.translate(s * R * 0.85, -R * 0.35);
-      c.rotate(s * -0.25 + Math.sin(time * 9 + s) * 0.06);
-      c.beginPath();
-      c.ellipse(s * R * 0.08, R * 0.55, R * 0.3, R * 0.68, 0, 0, Math.PI * 2);
-      outlined(k.ear, ol, Math.max(1.5, 0.03 * u), c);
-      c.restore();
-    }
+  c.strokeStyle = 'rgba(27,36,64,0.3)'; c.lineWidth = Math.max(1, 0.02 * u); c.stroke();
+  if (k.beard) { // schnauzer beard
+    c.beginPath();
+    c.moveTo(-R * 0.5, R * 0.45); c.quadraticCurveTo(-R * 0.4, R * 1.05, 0, R * 1.08);
+    c.quadraticCurveTo(R * 0.4, R * 1.05, R * 0.5, R * 0.45);
+    blob(c, k.light, ow * 0.7);
   }
+  earsFront(c, k, R, ow, Math.abs(Math.sin(time * 4.5)) * 0.15);
   // Eyes: determined look, with the upper lid slanting down toward the nose
   for (const s of [-1, 1]) {
     const ex = s * R * 0.34, ey = -R * 0.06;
@@ -1028,7 +1183,7 @@ function drawFace(c, k, kind, R, u, time, ol) {
     c.strokeStyle = ol; c.lineWidth = Math.max(1.5, 0.03 * u);
     c.beginPath(); c.ellipse(ex, ey, R * 0.19, R * 0.23, 0, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
     // bold eyebrow, angled down toward the nose
-    c.strokeStyle = kind === 'police' ? '#3a2010' : '#9a4d12';
+    c.strokeStyle = k.brow;
     c.lineWidth = Math.max(2.5, 0.075 * R + 0.02 * u);
     c.beginPath();
     c.moveTo(ex - s * R * 0.17, ey - R * 0.3);
@@ -1049,34 +1204,8 @@ function drawFace(c, k, kind, R, u, time, ol) {
   c.quadraticCurveTo(R * 0.14, R * 0.52, R * 0.27, R * 0.37);
   c.stroke();
 
-  // Hats
-  if (kind === 'fire') {
-    // firefighter helmet: dome, brim, front badge
-    c.beginPath();
-    c.ellipse(0, -R * 0.55, R * 0.82, R * 0.62, 0, Math.PI, 0);
-    c.closePath();
-    outlined('#e63946', ol, Math.max(1.5, 0.035 * u), c);
-    c.strokeStyle = '#ffd43b'; c.lineWidth = Math.max(2, 0.06 * u);
-    c.beginPath(); c.moveTo(0, -R * 1.17); c.lineTo(0, -R * 0.6); c.stroke();
-    c.beginPath(); c.ellipse(0, -R * 0.55, R * 1.08, R * 0.17, 0, 0, Math.PI * 2);
-    outlined('#c1121f', ol, Math.max(1.5, 0.035 * u), c);
-    c.beginPath(); c.roundRect(-R * 0.22, -R * 0.98, R * 0.44, R * 0.34, R * 0.08);
-    outlined('#ffd43b', '#b8860b', Math.max(1, 0.02 * u), c);
-    c.fillStyle = '#e63946';
-    c.beginPath(); c.arc(0, -R * 0.81, R * 0.08, 0, Math.PI * 2); c.fill();
-  } else {
-    // police cap: crown, band, visor, star
-    c.beginPath();
-    c.moveTo(-R * 0.62, -R * 0.62); c.lineTo(-R * 0.78, -R * 1.12);
-    c.quadraticCurveTo(0, -R * 1.42, R * 0.78, -R * 1.12); c.lineTo(R * 0.62, -R * 0.62);
-    c.closePath();
-    outlined('#1f3d8a', ol, Math.max(1.5, 0.035 * u), c);
-    c.beginPath(); c.rect(-R * 0.64, -R * 0.74, R * 1.28, R * 0.16);
-    outlined('#14275a', ol, Math.max(1, 0.025 * u), c);
-    c.beginPath(); c.ellipse(0, -R * 0.56, R * 0.66, R * 0.13, 0, 0, Math.PI);
-    outlined('#111', ol, Math.max(1, 0.025 * u), c);
-    star(c, 0, -R * 0.98, R * 0.17, '#ffd43b', '#b8860b');
-  }
+
+  drawHat(c, k, R, ow, false);
 }
 
 /**
@@ -1126,12 +1255,8 @@ function drawDogBack(c, x, y, u, kind, o) {
   // Rescue backpack on the back
   const bw = 0.32 * u, bh = 0.2 * u * sy, by = Y(-0.74);
   c.beginPath(); c.roundRect(-bw / 2, by, bw, bh, 0.06 * u);
-  blob(c, kind === 'fire' ? '#e63946' : '#24489e', ow);
-  if (kind === 'fire') {
-    c.fillStyle = '#ffd43b'; c.beginPath(); c.arc(0, by + bh / 2, 0.05 * u, 0, Math.PI * 2); c.fill();
-  } else {
-    star(c, 0, by + bh / 2, 0.06 * u, '#ffd43b', '#b8860b');
-  }
+  blob(c, k.pack, ow);
+  drawMark(c, k, 0, by + bh / 2, 0.065 * u);
   gloss(c, -bw * 0.28, by + bh * 0.3, 0.03 * u, 0.06 * u, 0.2);
 
   // Hind legs: a gallop kicks both back legs up, showing the paw pads
