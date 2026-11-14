@@ -89,6 +89,29 @@ button.big small { font-size: 14px; font-weight: 700; opacity: 0.9; }
 .fine { font-size: 14px; color: var(--muted); max-width: 560px; line-height: 1.45; font-weight: 700; }
 .fine a { color: var(--accent-dark); }
 
+/* camera picker (grown-ups) */
+#start details.grown-ups { font-size: 15px; color: var(--muted); max-width: 560px; margin-top: 4px; }
+#start details.grown-ups summary { cursor: pointer; color: var(--accent-dark); }
+.cam-pick { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; }
+#camera {
+  font: inherit;
+  font-size: 16px;
+  max-width: min(360px, 90vw);
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  background: #fff;
+  color: var(--ink);
+}
+#link { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; }
+#link[hidden] { display: none; }
+#link.ok .state { color: var(--go-dark); }
+#link.ok .url { display: none; }
+#link .url { font-size: 17px; padding: 6px 12px; border-radius: 10px; background: #fff; color: var(--ink); user-select: all; -webkit-user-select: all; }
+#link .qr { width: 168px; max-width: 50vw; background: #fff; border-radius: 10px; padding: 6px; }
+#link .qr:empty, #link .qr[hidden] { display: none; }
+#link .qr svg { display: block; width: 100%; height: auto; }
+
 /* ---------- game layout ---------- */
 #game {
   display: grid;

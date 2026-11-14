@@ -30,28 +30,22 @@ export class HandTracker {
     this.nextId = 1;
   }
 
-  async start(onStatus = () => {}) {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser does not support camera access.');
-    onStatus('Asking for the camera…');
+  /**
+   * Opens the camera chosen in the shared picker (PC camera or phone over Wi-Fi,
+   * see ../arcade/js/camera.js) and loads the model. Resolves false while we're
+   * still waiting for the phone to connect.
+   */
+  async start(camera, onStatus = () => {}) {
+    onStatus(camera.usingPhone() ? 'Connecting to the phone…' : 'Asking for the camera…');
     const model = this.loadModel();
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-    });
-    this.video.srcObject = stream;
-    try {
-      await this.video.play();
-    } catch (err) {
-      console.warn('video.play() failed', err);
-    }
+    const ready = await camera.start();
     onStatus('Loading hand tracking…');
     await model;
+    return ready;
   }
 
-  stop() {
-    const s = this.video.srcObject;
-    if (s) s.getTracks().forEach((t) => t.stop());
-    this.video.srcObject = null;
+  stop(camera) {
+    camera?.stop();
     this.cursors = [];
   }
 

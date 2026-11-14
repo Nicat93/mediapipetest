@@ -594,7 +594,8 @@ function toStart(message = '') {
     pointers.delete(id);
   }
   ui.fx.innerHTML = '';
-  tracker?.stop();
+  waitingForPhone = false;
+  tracker?.stop(camera);
   ui.cam.classList.add('hidden');
   ui.game.classList.add('hidden');
   ui.start.classList.remove('hidden');
@@ -606,23 +607,51 @@ $('play-touch').addEventListener('click', () => {
   audio();
   startGame(false);
 });
+// Camera picker (PC camera or phone over Wi-Fi), shared with the arcade games.
+let camera = null;
+let waitingForPhone = false;
+import('../../arcade/js/camera.js')
+  .then(({ createCamera }) => {
+    camera = createCamera({
+      video: $('cam-video'),
+      select: $('camera'),
+      linkEl: $('link'),
+      isActive: () => mode === 'hands' && phase !== 'start',
+      onPhoneReady: () => {
+        if (waitingForPhone) $('play-hands').click();
+      },
+      onError: (text) => (ui.startMsg.textContent = text),
+    });
+  })
+  .catch((err) => console.warn('Camera picker unavailable', err));
+
 $('play-hands').addEventListener('click', async () => {
   audio();
-  say('Hello, little chef!');
+  if (!waitingForPhone) say('Hello, little chef!');
+  waitingForPhone = false;
   ui.startMsg.textContent = '';
   ui.loading.classList.remove('hidden');
   try {
+    if (!camera) throw new Error('The camera code did not load. Check the internet connection and reload.');
     if (!tracker) {
       ui.loadingText.textContent = 'Loading…';
       const { HandTracker } = await import('./hands.js');
       tracker = new HandTracker($('cam-video'), $('cam-canvas'));
     }
-    await tracker.start((msg) => (ui.loadingText.textContent = msg));
+    const ready = await tracker.start(camera, (msg) => (ui.loadingText.textContent = msg));
     ui.loading.classList.add('hidden');
+    if (!ready) {
+      // Phone chosen but not connected yet: show the QR code and start once it connects.
+      waitingForPhone = true;
+      document.querySelector('#start details.grown-ups').open = true;
+      ui.startMsg.textContent = 'Waiting for the phone… Scan the QR code below with it.';
+      $('link').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     startGame(true);
   } catch (err) {
     console.error(err);
-    tracker?.stop();
+    tracker?.stop(camera);
     ui.loading.classList.add('hidden');
     let msg = err?.message || String(err);
     if (err?.name === 'NotAllowedError') msg = 'Camera permission was denied.';

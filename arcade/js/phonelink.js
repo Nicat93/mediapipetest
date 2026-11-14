@@ -53,7 +53,8 @@ export class PhoneLink {
   }
 
   get phoneUrl() {
-    const url = new URL('phone.html', location.href);
+    // arcade/phone.html, also when another folder's page (e.g. cooking/) uses this link
+    const url = new URL('../phone.html', import.meta.url);
     url.hash = this.code;
     return url.href;
   }

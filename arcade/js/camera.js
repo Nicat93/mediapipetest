@@ -153,5 +153,5 @@ export function createCamera({ video, select, linkEl, onAttach, onPhoneReady, on
   navigator.mediaDevices?.addEventListener?.('devicechange', listCameras);
   listCameras();
 
-  return { start, usingPhone };
+  return { start, stop: stopLocal, usingPhone };
 }

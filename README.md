@@ -6,7 +6,7 @@ tracking that runs entirely in the browser. The root `index.html` is a menu that
 | Folder | Game | Controls |
 | --- | --- | --- |
 | [`ride/`](ride/) | **Pose Rider** (bike, `ride/index.html`) and **Pose Driver** (car, `ride/car.html`) | Pose tracking: tilt your hands like handlebars / a steering wheel. Phone-as-camera over Wi-Fi. Keyboard and touch fallback. See [`ride/README.md`](ride/README.md). |
-| [`cooking/`](cooking/) | **Little Chef**, a cooking game for 3–5 year olds | Hand tracking: hold a hand over food to pick it up, move it to the pot, wave to cook. Touch / mouse: drag or tap. |
+| [`cooking/`](cooking/) | **Little Chef**, a cooking game for 3–5 year olds | Hand tracking: hold a hand over food to pick it up, move it to the pot, wave to cook. PC webcam or phone over Wi-Fi. Touch / mouse: drag or tap. |
 | [`arcade/`](arcade/) | **Bubble Pop** (`arcade/bubble-pop.html`), **Body Blitz** (`arcade/body-blitz.html`) and **Neon Dash** (`arcade/neon-dash.html`), **Pup Rescue Run** (`arcade/pup-rescue.html`) | Bubble Pop: hand tracking, pop bubbles with your hands. Body Blitz, Neon Dash and Pup Rescue Run: full-body pose tracking (hit targets, dodge, switch lanes, squat). PC webcam or phone over Wi-Fi. See [`arcade/README.md`](arcade/README.md). |
 
 ## Adding a game
@@ -48,6 +48,8 @@ Made for a 4-year-old: no reading, no timers, no way to lose.
 With the camera, the middle part of the image is mapped to the whole screen so small arms reach every corner,
 and both hands can be used. Picking up takes holding the hand over a food for about half a second; buttons
 need about a second. Grown-ups can still help with the mouse or touch at the same time.
+To use a phone as the camera, open **Camera** on the start screen, pick *Phone (Wi‑Fi)* and scan the QR code
+(it uses the arcade's phone page, `arcade/phone.html`); the game starts as soon as the phone connects.
 
 Files: `cooking/index.html`, `cooking/style.css`, `cooking/js/main.js` (game), `cooking/js/hands.js`
 (webcam + MediaPipe Hand Landmarker → hand cursors).

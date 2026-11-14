@@ -23,8 +23,18 @@
     <p class="msg" id="start-msg" role="status"></p>
     <p class="fine">
       For grown-ups: the game talks, so turn the sound on. With the camera, your child picks food up by holding a hand
-      over it, then moves it to the pot. The video stays on this device. <a href="../">All games</a>
+      over it, then moves it to the pot. The video isn’t uploaded anywhere. To use a phone as the camera, open “Camera” below. <a href="../">All games</a>
     </p>
+    <details class="grown-ups">
+      <summary>Camera</summary>
+      <label class="cam-pick">Camera for “Play with hands”
+        <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
+      </label>
+      <div id="link" hidden>
+        <span class="state"></span>
+        <span class="url"></span>
+      </div>
+    </details>
   </section>
 
   <section id="game" class="screen hidden">
