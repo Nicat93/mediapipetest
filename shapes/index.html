@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Copy My Hands</title>
+  <meta name="description" content="A hand-shape copying game for small children: make the same shape as the ghost hand, from one simple hand up to two hands.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <!-- ============ start ============ -->
+  <section id="start" class="screen">
+    <div class="logo" aria-hidden="true">🖐️</div>
+    <h1>Copy My Hands</h1>
+    <p class="tag">Make the same shape with your hands!</p>
+    <div class="start-buttons">
+      <button id="play" class="big"><span class="ico" aria-hidden="true">▶️</span>Play<small>Level 1</small></button>
+      <button id="restart" class="big alt hidden"><span class="ico" aria-hidden="true">🔁</span>Start again<small>from level 1</small></button>
+    </div>
+    <label class="cam-pick">Camera
+      <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
+    </label>
+    <div id="link" hidden>
+      <span class="state"></span>
+      <span class="url"></span>
+    </div>
+    <p class="msg" id="start-msg" role="status"></p>
+    <details class="grown-ups">
+      <summary>Grown-ups</summary>
+      <p>
+        A ghost hand shows a shape. Your child makes the same shape in front of the camera and holds it for a second.
+        The closer the match, the more stars (up to 3). Fingers turn green when they match.
+        Levels start with one hand and easy shapes (high five, fist, pointing), then add more fingers,
+        tilted hands, two hands, and finally two different shapes at different heights.
+      </p>
+      <p>
+        Stand or sit so both hands fit in the picture, palms toward the camera. Hover a hand over 🏠 ⏭ 🔈 for a moment to press them.
+        The video stays on this device.
+      </p>
+      <p><a href="../">All games</a></p>
+    </details>
+  </section>
+
+  <!-- ============ game ============ -->
+  <section id="game" class="screen hidden">
+    <canvas id="stage"></canvas>
+    <header>
+      <button id="btn-home" class="tool hb" aria-label="Home">🏠</button>
+      <div class="info">
+        <canvas id="card" aria-hidden="true"></canvas>
+        <div>
+          <div class="lvl">Level <span id="level-no">1</span></div>
+          <div id="title" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="right">
+        <button id="btn-again" class="tool hb" aria-label="Say it again">🔈</button>
+        <button id="btn-skip" class="tool hb" aria-label="Next shape">⏭</button>
+        <button id="btn-sound" class="tool" aria-label="Sound on or off">🔊</button>
+      </div>
+    </header>
+    <footer>
+      <div id="tip" aria-live="polite"></div>
+      <div id="meter">
+        <div id="meter-fill"></div>
+        <div id="meter-pass"></div>
+        <div id="meter-text">0%</div>
+      </div>
+    </footer>
+    <div id="win" class="hidden">
+      <div id="win-stars"></div>
+      <div id="win-text"></div>
+    </div>
+  </section>
+
+  <div id="fx" aria-hidden="true"></div>
+  <video id="cam-video" playsinline muted hidden></video>
+  <div id="loading" class="hidden"><div class="spinner"></div><p id="loading-text">Loading…</p></div>
+</body>
+</html>
