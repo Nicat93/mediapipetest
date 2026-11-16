@@ -1,4 +1,4 @@
-// Phone side: send this phone's camera to an MP Arcade game on a computer via WebRTC.
+// Phone side: send this phone's camera to a game on a computer via WebRTC (any game using common/camera.js).
 import { loadScript, PEERJS_URL, ID_PREFIX } from './phonelink.js';
 
 const $ = (id) => document.getElementById(id);
@@ -213,7 +213,7 @@ function connected() {
   setStatus('Live', 'ok');
   setCard(
     'Connected!',
-    'Prop this phone up 1.5–2 m away so it sees your whole body (for Bubble Pop, head to waist is enough). Then play on your computer. Keep this page open.',
+    'Prop this phone up 1.5–2 m away facing you: whole body for running and jumping games, head to waist for hand games. Then play on your computer. Keep this page open.',
   );
   ui.flip.classList.remove('hidden');
   ui.hide.classList.remove('hidden');
@@ -290,6 +290,6 @@ if (code) {
   connect();
 } else {
   setStatus('Not paired');
-  setCard('Phone camera', 'On your computer, open an MP Arcade game and pick "Phone (Wi‑Fi)" as the camera. Then scan the QR code, or type the code here.');
+  setCard('Phone camera', 'On your computer, open a game and pick "Phone (Wi‑Fi)" as the camera. Then scan the QR code, or type the code here.');
   showCodeForm();
 }

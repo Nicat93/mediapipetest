@@ -1,13 +1,10 @@
 // Body Blitz — full-body game using MediaPipe Pose Landmarker.
 // Hit blue targets with your hands, orange targets with your feet,
 // and duck under the red lasers. Lives are picked on the start screen (1–10 or infinite).
-import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs';
-import { createCamera } from './camera.js';
+import { PoseTracker } from '../../common/tracking.js';
+import { createShell } from '../../common/shell.js';
 import { livesPicker, heartsText } from './lives.js';
 
-const WASM_PATH = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm';
-const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
 
 // Pose landmark indices
 const NOSE = 0, L_SHOULDER = 11, R_SHOULDER = 12, L_HIP = 23, R_HIP = 24;
@@ -22,12 +19,11 @@ const LASER_WARN = 1.6;
 const LASER_FIRE = 0.35;
 const BEST_KEY = 'bodyblitz.best';
 
-const video = document.getElementById('cam');
-const canvas = document.getElementById('game');
+const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
-const overlay = document.getElementById('overlay');
+const titleEl = document.getElementById('title');
+const playLabel = document.querySelector('#play .label');
 const msg = document.getElementById('msg');
-const startBtn = document.getElementById('start');
 const hud = document.getElementById('hud');
 const scoreEl = document.getElementById('score');
 const multEl = document.getElementById('mult');
@@ -35,10 +31,7 @@ const livesEl = document.getElementById('lives');
 const getMaxLives = livesPicker(document.getElementById('lives-pick'), 'bodyblitz.lives');
 let maxLives = getMaxLives();
 
-let landmarker = null;
 let looping = false;
-let wantStart = false;
-let lastVideoTime = -1;
 let pose = null;      // latest pose in screen pixels, or null
 let body = null;      // derived measurements, or null
 
@@ -62,62 +55,23 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-async function createLandmarker() {
-  const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
-  const opts = (delegate) => ({
-    baseOptions: { modelAssetPath: MODEL_URL, delegate },
-    runningMode: 'VIDEO',
-    numPoses: 1,
-    minPoseDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5,
-  });
-  try {
-    return await PoseLandmarker.createFromOptions(fileset, opts('GPU'));
-  } catch (err) {
-    console.warn('GPU delegate failed, falling back to CPU', err);
-    return await PoseLandmarker.createFromOptions(fileset, opts('CPU'));
-  }
-}
-
-const camera = createCamera({
-  video,
-  select: document.getElementById('camera'),
-  linkEl: document.getElementById('link'),
-  onAttach: () => (lastVideoTime = -1),
-  onPhoneReady: () => wantStart && state === 'idle' && tryStart(),
-  onError: (text) => (msg.textContent = text),
-  isActive: () => state !== 'idle',
+// Start screen, camera picker (PC or phone), loading and errors: ../../common/shell.js
+const shell = createShell({
+  lang: 'en',
+  unlock: () => {}, // browsers only allow sound after a click
+  tracker: (v) => new PoseTracker(v, { model: 'full', smooth: false }),
+  onPlay: () => newGame(),
 });
+const video = shell.video;
+document.getElementById('play').addEventListener('click', () => shell.play());
 
-async function tryStart() {
-  if (!landmarker) {
-    msg.textContent = 'Loading body tracking…';
-    landmarker = await createLandmarker();
-  }
-  msg.textContent = camera.usingPhone() ? 'Connecting to your phone…' : 'Starting camera…';
-  if (!(await camera.start())) {
-    wantStart = true;
-    msg.textContent = 'Waiting for your phone. Scan the QR code below with it (or open the address and type the code), then allow the camera.';
-    return;
-  }
-  wantStart = false;
-  newGame();
+// Newest body landmarks: undefined when there's no new camera frame, null when nobody is in view.
+function poseFrame(now) {
+  const t = shell.tracker;
+  if (shell.mode !== 'camera' || !t) return undefined;
+  t.update(now);
+  return t.fresh ? t.result.landmarks?.[0] ?? null : undefined;
 }
-
-startBtn.addEventListener('click', async () => {
-  startBtn.disabled = true;
-  try {
-    await tryStart();
-  } catch (err) {
-    console.error(err);
-    msg.textContent =
-      err?.name === 'NotAllowedError'
-        ? 'Camera permission was denied. Allow camera access for this site in your browser settings, then reload.'
-        : `Couldn't start: ${err?.message || err}`;
-  } finally {
-    startBtn.disabled = false;
-  }
-});
 
 // ---------- game flow ----------
 
@@ -130,8 +84,6 @@ function newGame() {
   score = 0; combo = 0; maxLives = getMaxLives(); lives = maxLives;
   targets = []; effects = []; laser = null;
   gt = 0; nextSpawn = 1; nextLaser = 9; lostFor = 0; hurtFlash = 0;
-  overlay.hidden = true;
-  hud.hidden = false;
   updateHud();
   setState('frame');
   if (!looping) {
@@ -146,11 +98,10 @@ function gameOver() {
   let best = 0;
   try { best = Math.max(score, Number(localStorage.getItem(BEST_KEY)) || 0); localStorage.setItem(BEST_KEY, best); } catch {}
   setTimeout(() => {
-    hud.hidden = true;
-    overlay.querySelector('h1').textContent = `Score: ${score}`;
+    titleEl.textContent = `Score: ${score}`;
     msg.textContent = best > 0 ? `Best: ${best}. Ready for another round?` : 'Ready for another round?';
-    startBtn.textContent = 'Play again';
-    overlay.hidden = false;
+    playLabel.textContent = 'Play again';
+    shell.home('', { keepGame: true }); // menu over the game, camera stays on
     setState('idle');
   }, 1800);
 }
@@ -175,10 +126,8 @@ function videoRect() {
 }
 
 function track(now) {
-  if (video.readyState < 2 || video.currentTime === lastVideoTime) return;
-  lastVideoTime = video.currentTime;
-  const result = landmarker.detectForVideo(video, now);
-  const lms = result.landmarks?.[0];
+  const lms = poseFrame(now);
+  if (lms === undefined) return; // no new camera frame
   if (!lms) { pose = null; body = null; return; }
 
   const r = videoRect();

@@ -11,7 +11,7 @@
 // (and touch play still works) when the CDN is unreachable.
 // See docs/NEW_GAME.md for the coordinate systems and every option.
 
-export const VISION_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+export const VISION_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3';
 export const MODELS = {
   hand: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
   poseLite: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
@@ -121,13 +121,46 @@ class Tracker {
     this.task = task;
     this.vision = vision;
   }
-  /** Runs the model on the newest frame. Returns the raw result, or null when there is no new frame. */
+  /**
+   * Runs the model on the newest frame. Returns the raw result, or null when there is no new frame.
+   * Afterwards `fresh` says whether this frame had new results and `result` is the latest raw result.
+   */
   detect(now) {
+    this.fresh = false;
     const v = this.video;
-    if (!this.task || !v.srcObject || v.readyState < 2 || v.currentTime === this.lastVideoTime) return null;
+    if (!this.task || !v.srcObject || v.readyState < 2) return null;
+    // A phone's video track goes "muted" when its frames stop arriving: don't keep
+    // tracking the last frozen frame (results expire after lostMs instead).
+    const track = v.srcObject.getVideoTracks?.()[0];
+    if (track && (track.muted || track.readyState === 'ended')) return null;
+    if (v.currentTime === this.lastVideoTime) return null;
     this.lastVideoTime = v.currentTime;
-    return this.task.detectForVideo(v, now);
+    this.result = this.task.detectForVideo(v, now);
+    this.fresh = true;
+    return this.result;
   }
+  /** Draws the skeletons on the preview canvas (if there is one). */
+  paint(lms, taskName, connections) {
+    const cv = this.preview;
+    if (!cv) return;
+    const v = this.video;
+    if (v.videoWidth && cv.width !== v.videoWidth) {
+      cv.width = v.videoWidth;
+      cv.height = v.videoHeight;
+    }
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const DrawingUtils = this.vision?.DrawingUtils;
+    if (DrawingUtils) {
+      this.drawer ||= new DrawingUtils(ctx);
+      for (const lm of lms) {
+        this.drawer.drawConnectors(lm, this.vision[taskName][connections] || [], { color: '#ffffff', lineWidth: 4 });
+        this.drawer.drawLandmarks(lm, { radius: 3, color: '#ff8fab', lineWidth: 1 });
+      }
+    }
+    this.afterDraw?.(ctx, lms, cv);
+  }
+
   /** Video aspect ratio (width / height), so distances can be measured in square units. */
   aspect() {
     const v = this.video;
@@ -158,10 +191,11 @@ export class HandTracker extends Tracker {
     matchDist = 0.25, // max palm movement between frames (camera units) to keep the same id
     confidence = 0.5,
     preview = null, // optional <canvas> over a video preview: draws the hand skeletons
+    afterDraw = null, // (ctx, landmarksList, canvas) => {} extra drawing on the preview
   } = {}) {
     super(video, 'hands');
     this.taskName = 'HandLandmarker';
-    Object.assign(this, { numHands, region, smoothCursor, smoothLandmarks, fist, lostMs, matchDist, confidence, preview });
+    Object.assign(this, { numHands, region, smoothCursor, smoothLandmarks, fist, lostMs, matchDist, confidence, preview, afterDraw });
     this.hands = [];
     this.nextId = 1;
   }
@@ -261,23 +295,9 @@ export class HandTracker extends Tracker {
   }
 
   drawPreview(lms) {
-    const cv = this.preview;
-    if (!cv) return;
-    const v = this.video;
-    if (v.videoWidth && cv.width !== v.videoWidth) {
-      cv.width = v.videoWidth;
-      cv.height = v.videoHeight;
-    }
-    const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    const { DrawingUtils, HandLandmarker } = this.vision || {};
-    if (!DrawingUtils) return;
-    this.drawer ||= new DrawingUtils(ctx);
-    for (const lm of lms) {
-      this.drawer.drawConnectors(lm, HandLandmarker.HAND_CONNECTIONS, { color: '#ffffff', lineWidth: 4 });
-      this.drawer.drawLandmarks(lm, { radius: 3, color: '#ff8fab', lineWidth: 1 });
-    }
+    this.paint(lms, 'HandLandmarker', 'HAND_CONNECTIONS');
   }
+
 }
 
 /**
@@ -294,11 +314,12 @@ export class PoseTracker extends Tracker {
     smooth = { minCutoff: 1.5, beta: 3.0 }, // false = raw
     lostMs = 400,
     confidence = 0.5,
-    preview = null,
+    preview = null, // optional <canvas> over a video preview: draws the skeleton
+    afterDraw = null, // (ctx, landmarksList, canvas) => {} extra drawing on the preview
   } = {}) {
     super(video, 'pose');
     this.taskName = 'PoseLandmarker';
-    Object.assign(this, { numPoses, model, smooth, lostMs, confidence, preview });
+    Object.assign(this, { numPoses, model, smooth, lostMs, confidence, preview, afterDraw });
     this.poses = [];
   }
 
@@ -335,23 +356,9 @@ export class PoseTracker extends Tracker {
   }
 
   drawPreview(lms) {
-    const cv = this.preview;
-    if (!cv) return;
-    const v = this.video;
-    if (v.videoWidth && cv.width !== v.videoWidth) {
-      cv.width = v.videoWidth;
-      cv.height = v.videoHeight;
-    }
-    const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    const { DrawingUtils, PoseLandmarker } = this.vision || {};
-    if (!DrawingUtils) return;
-    this.drawer ||= new DrawingUtils(ctx);
-    for (const lm of lms) {
-      this.drawer.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, { color: '#ffffff', lineWidth: 4 });
-      this.drawer.drawLandmarks(lm, { radius: 3, color: '#ff8fab', lineWidth: 1 });
-    }
+    this.paint(lms, 'PoseLandmarker', 'POSE_CONNECTIONS');
   }
+
 }
 
 // ------------------------------------------------------- camera on a canvas

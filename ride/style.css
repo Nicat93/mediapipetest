@@ -1,12 +1,27 @@
+/* Pose Rider / Pose Driver. The main menu, camera picker, loading and camera
+   preview come from ../common/kit.css (re-skinned with the variables below);
+   this file has the HUD, the in-game panels and the settings. */
 :root {
   --ink: #2b2d42;
   --muted: #5c6178;
   --accent: #e63946;
   --accent-dark: #b92b37;
+  --alt: #2a9d8f;
+  --alt-dark: #1f7a6f;
   --gold: #ffb703;
   --ok: #2a9d8f;
   --card: #ffffff;
   --sky: #a8d8ff;
+  --title: var(--accent);
+  --title-shadow: transparent;
+  --link: var(--accent);
+  --error: var(--accent-dark);
+  --spinner-track: #e8ebf3;
+  --loading-bg: rgba(168, 216, 255, 0.85);
+  --start-bg: linear-gradient(rgba(20, 30, 60, 0.15), rgba(20, 30, 60, 0.45));
+  --font: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --title-font: "Lilita One", "Nunito", sans-serif;
+  --title-weight: 400;
 }
 
 * { box-sizing: border-box; }
@@ -103,40 +118,22 @@ html, body {
 #steer svg { width: 100%; display: block; overflow: visible; }
 #steer-bar { transform-origin: 110px 35px; transform-box: view-box; }
 
-/* ---------- camera preview ---------- */
-#cam {
-  position: fixed;
-  right: 16px;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  width: 220px;
-  aspect-ratio: 4 / 3;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 3px solid #fff;
-  background: #111;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-  z-index: 5;
-}
-#cam video, #cam canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
-}
-#cam-badge {
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 800;
-  color: #fff;
-  background: var(--accent);
-}
-#cam-badge.ok { background: var(--ok); }
+/* ---------- camera preview (made by common/shell.js) ---------- */
+.kit-preview { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); width: 220px; border: 3px solid #fff; border-radius: 14px; z-index: 5; }
+.kit-preview video, .kit-preview canvas { object-fit: contain; }
+.kit-preview.portrait { width: 150px; }
+.kit-badge { padding: 3px 9px; font-size: 12px; font-weight: 800; background: var(--accent); }
+.kit-badge.ok { background: var(--ok); }
+
+/* ---------- main menu (#start from kit.css, content in a card) ---------- */
+#start { padding: 16px; }
+#start .panel { max-width: 560px; }
+#start h1 { font-size: clamp(40px, 11vw, 60px); text-shadow: none; }
+#start .tag { font-size: 16px; color: var(--muted); margin: 6px 0 0; }
+#start button.big { min-width: 200px; font-size: 22px; }
+#start button.big .ico { font-size: 40px; }
+#start .cam-pick { margin-top: 14px; }
+@media (max-width: 600px) { #start { padding-top: 66px; } } /* clear the ⚙ / FPV corner buttons */
 
 /* ---------- countdown ---------- */
 #big {
@@ -237,7 +234,7 @@ html, body {
   justify-content: center;
   margin-top: 16px;
 }
-button {
+#overlay button, #settings button {
   font: inherit;
   font-weight: 800;
   font-size: 17px;
@@ -249,10 +246,10 @@ button {
   color: var(--ink);
   transition: transform 0.1s, background 0.15s;
 }
-button:hover { background: #dde1ec; }
-button:active { transform: scale(0.97); }
+#overlay button:hover, #settings button:hover { background: #dde1ec; }
+#overlay button:active, #settings button:active { transform: scale(0.97); }
 button.primary { background: var(--accent); color: #fff; box-shadow: 0 4px 0 var(--accent-dark); }
-button.primary:hover { background: #ef4552; }
+#overlay button.primary:hover, #settings button.primary:hover { background: #ef4552; }
 button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .fine { font-size: 13px; color: var(--muted); }
 .error {
@@ -262,17 +259,6 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
   padding: 10px 12px;
   font-weight: 700;
 }
-
-.spinner {
-  width: 46px;
-  height: 46px;
-  margin: 10px auto 14px;
-  border-radius: 50%;
-  border: 5px solid #e8ebf3;
-  border-top-color: var(--accent);
-  animation: spin 0.9s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .progress {
   height: 14px;
@@ -315,46 +301,10 @@ button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 .best { color: var(--gold); font-weight: 800; }
 
 @media (max-width: 600px) {
-  #cam { width: 132px; right: 12px; }
+  .kit-preview { width: 132px; right: 12px; }
   .hud-box { font-size: 16px; min-width: 70px; padding: 5px 9px; }
   #steer { width: 150px; left: 16px; transform: none; }
   .panel { padding: 20px 18px 18px; }
-}
-
-/* ---------- phone pairing ---------- */
-.pair {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin: 14px 0 6px;
-  text-align: left;
-}
-.qr {
-  flex: 0 0 168px;
-  width: 168px;
-  aspect-ratio: 1;
-  background: #fff;
-  border-radius: 12px;
-  border: 2px solid #e8ebf3;
-  overflow: hidden;
-}
-.qr svg { display: block; width: 100%; height: 100%; }
-.pair-info p { margin-top: 0; }
-.code {
-  font-family: "Lilita One", "Nunito", sans-serif;
-  font-size: 40px;
-  letter-spacing: 0.12em;
-  color: var(--accent);
-  line-height: 1.1;
-  margin: 4px 0 6px;
-}
-.link { font-size: 13px; color: var(--muted); word-break: break-all; }
-#cam.portrait { width: 150px; }
-#cam video, #cam canvas { object-fit: contain; }
-
-@media (max-width: 600px) {
-  .pair { flex-direction: column; text-align: center; }
-  #cam.portrait { width: 96px; }
 }
 
 @media (max-width: 600px) {

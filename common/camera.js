@@ -1,10 +1,10 @@
-// Shared camera source for the arcade games: a <select> with "Phone (Wi-Fi)"
-// (WebRTC stream from phone.html, paired with a code / QR via PeerJS, see
+// Shared camera source for all games (used through shell.js): a <select> with "Phone (Wi-Fi)"
+// (WebRTC stream from common/phone.html, paired with a code / QR via PeerJS, see
 // phonelink.js) plus every camera the PC can see (webcams, phone USB webcam
 // mode, phone-webcam apps).
 
 export const PHONE = 'phone';
-const CAM_KEY = 'mparcade.cameraId'; // shared by all arcade games
+const CAM_KEY = 'mparcade.cameraId'; // shared by all games (old name kept so the saved choice survives)
 
 /**
  * @param {object} o

@@ -18,12 +18,12 @@ Copy [`template/`](template/) (a small working game, *Star Catcher*) to a new fo
 
 | File | What it gives you |
 | --- | --- |
-| `common/kit.css` | The look: start screen, big buttons, camera picker, Grown-ups box, tool buttons, hand-dwell rings, loading overlay, camera preview, confetti. Re-skin with CSS variables. |
-| `common/shell.js` | `createShell()`: start screen ⇄ game, camera picker (PC or phone over Wi‑Fi), loading, waiting for the phone, error messages, loading MediaPipe. |
+| `common/kit.css` | The look: start screen, big buttons, camera picker, Grown-ups box, tool buttons, hand-dwell rings, loading overlay, camera preview, confetti. Re-skin with CSS variables; `theme-neon` is the dark arcade look. |
+| `common/shell.js` | `createShell()`: start screen ⇄ game, camera picker (PC or phone over Wi‑Fi), loading, waiting for the phone, error messages, loading MediaPipe. Uses `camera.js`, `phonelink.js` and the phone page `phone.html`. |
 | `common/tracking.js` | `HandTracker` / `PoseTracker`: MediaPipe models, One Euro smoothing, stable hand ids, cursors, fist detection; helpers to draw the mirrored camera on a canvas. |
 | `common/fx.js` | Sound on/off, beeps, a talking voice (any language), confetti, emoji bursts, buttons pressed by holding a hand over them, hand pointers, the frame loop, saved settings. |
 
-Copy My Hands, Little Chef and Ərəbcə Rəqəmlər use it; the `arcade/` and `ride/` games predate it and still have their own copies.
+Every game uses it, so all menus look alike and share one camera picker and phone page (`common/phone.html`).
 Add a card for the new game in the root `index.html` and a row in the table above.
 
 ## Play on GitHub Pages
@@ -65,7 +65,7 @@ Two switches under **Settings** on the start screen (both on by default, remembe
 - *Auto release*: food drops into the pot as soon as it reaches it. When off, a fist must open over the pot,
   and food picked up by hovering goes in after holding still over the pot for about half a second.
 To use a phone as the camera, use the **Camera** picker on the start screen, pick *Phone (Wi‑Fi)* and scan the QR code
-(it uses the arcade's phone page, `arcade/phone.html`); the game starts as soon as the phone connects.
+(the shared phone page, `common/phone.html`); the game starts as soon as the phone connects.
 
 Files: `cooking/index.html`, `cooking/style.css`, `cooking/js/main.js` (game). Hand tracking and the
 start screen / camera flow come from `common/` (see below).

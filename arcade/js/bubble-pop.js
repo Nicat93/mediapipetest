@@ -1,28 +1,23 @@
-import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs';
-import { createCamera } from './camera.js';
+// Bubble Pop: pop rising bubbles with your hands (MediaPipe hand tracking).
+// Start screen, camera / phone and MediaPipe loading: ../common (docs/NEW_GAME.md).
+import { HandTracker, coverFit, toScreen, drawVideo } from '../../common/tracking.js';
+import { createShell } from '../../common/shell.js';
 
-const WASM_PATH = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm';
-const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 const ROUND_SECONDS = 60;
 const PALM = [0, 5, 9, 13, 17]; // wrist + finger bases: their average is the hand's center
 
-const video = document.getElementById('cam');
-const canvas = document.getElementById('game');
+const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
-const overlay = document.getElementById('overlay');
+const titleEl = document.getElementById('title');
 const msg = document.getElementById('msg');
-const startBtn = document.getElementById('start');
-const hud = document.getElementById('hud');
+const playLabel = document.querySelector('#play .label');
 const scoreEl = document.getElementById('score');
 const timeEl = document.getElementById('time');
 
-let landmarker = null;
 let running = false;
 let score = 0;
 let endTime = 0;
 let lastSpawn = 0;
-let lastVideoTime = -1;
 let bubbles = [];
 let pops = [];
 let hands = []; // { x, y, r, points } per tracked hand, in screen pixels
@@ -38,65 +33,13 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-async function createLandmarker() {
-  const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
-  const opts = (delegate) => ({
-    baseOptions: { modelAssetPath: MODEL_URL, delegate },
-    runningMode: 'VIDEO',
-    numHands: 2,
-  });
-  try {
-    return await HandLandmarker.createFromOptions(fileset, opts('GPU'));
-  } catch (err) {
-    console.warn('GPU delegate failed, falling back to CPU', err);
-    return await HandLandmarker.createFromOptions(fileset, opts('CPU'));
-  }
-}
-
-// ---------- camera ----------
-// Phone (Wi-Fi) via /phone.html, or any camera the PC sees (see camera.js).
-
-let wantStart = false; // Start was pressed but we're still waiting for the phone
-
-const camera = createCamera({
-  video,
-  select: document.getElementById('camera'),
-  linkEl: document.getElementById('link'),
-  onAttach: () => (lastVideoTime = -1),
-  onPhoneReady: () => wantStart && !running && tryStart(),
-  onError: (text) => (msg.textContent = text),
-  isActive: () => running,
+const shell = createShell({
+  lang: 'en',
+  tracker: (video) => new HandTracker(video, { numHands: 2, smoothLandmarks: false }),
+  onPlay: () => startRound(),
 });
-
-async function tryStart() {
-  if (!landmarker) {
-    msg.textContent = 'Loading hand tracking…';
-    landmarker = await createLandmarker();
-  }
-  msg.textContent = camera.usingPhone() ? 'Connecting to your phone…' : 'Starting camera…';
-  if (!(await camera.start())) {
-    wantStart = true;
-    msg.textContent = 'Waiting for your phone. Scan the QR code below with it (or open the address and type the code), then allow the camera.';
-    return;
-  }
-  wantStart = false;
-  startRound();
-}
-
-startBtn.addEventListener('click', async () => {
-  startBtn.disabled = true;
-  try {
-    await tryStart();
-  } catch (err) {
-    console.error(err);
-    msg.textContent =
-      err?.name === 'NotAllowedError'
-        ? 'Camera permission was denied. Allow camera access for this site in your browser settings, then reload.'
-        : `Couldn't start: ${err?.message || err}`;
-  } finally {
-    startBtn.disabled = false;
-  }
-});
+const video = shell.video;
+document.getElementById('play').addEventListener('click', () => shell.play());
 
 // ---------- game ----------
 
@@ -106,8 +49,6 @@ function startRound() {
   pops = [];
   endTime = performance.now() + ROUND_SECONDS * 1000;
   scoreEl.textContent = '0';
-  overlay.hidden = true;
-  hud.hidden = false;
   if (!running) {
     running = true;
     requestAnimationFrame(loop);
@@ -116,12 +57,11 @@ function startRound() {
 
 function endRound() {
   running = false;
-  hud.hidden = true;
-  overlay.querySelector('h1').textContent = `Score: ${score}`;
+  titleEl.textContent = `Score: ${score}`;
   msg.textContent = 'Nice! Ready for another round?';
-  startBtn.textContent = 'Play again';
-  overlay.hidden = false;
-  drawFrame(performance.now()); // keep last frame visible behind overlay
+  playLabel.textContent = 'Play again';
+  drawFrame(performance.now());
+  shell.home('', { keepGame: true }); // menu over the last frame, camera stays on
 }
 
 function spawnBubble() {
@@ -136,36 +76,15 @@ function spawnBubble() {
   });
 }
 
-// Maps a normalized landmark to screen pixels, matching how the video is drawn
-// ("cover" fit, mirrored like a selfie).
-function toScreen(lm, fit) {
-  const x = fit.dx + lm.x * fit.dw;
-  const y = fit.dy + lm.y * fit.dh;
-  return { x: innerWidth - x, y };
-}
-
-function coverFit() {
-  const vw = video.videoWidth || 640;
-  const vh = video.videoHeight || 480;
-  const scale = Math.max(innerWidth / vw, innerHeight / vh);
-  const dw = vw * scale;
-  const dh = vh * scale;
-  return { dx: (innerWidth - dw) / 2, dy: (innerHeight - dh) / 2, dw, dh };
-}
-
 let prev = performance.now();
 function loop(now) {
   if (!running) return;
   const dt = Math.min((now - prev) / 1000, 0.05);
   prev = now;
 
-  // Hand tracking (only when a new video frame is available)
-  if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
-    lastVideoTime = video.currentTime;
-    const result = landmarker.detectForVideo(video, now);
-    const fit = coverFit();
-    hands = (result.landmarks || []).map((hand) => handArea(hand.map((p) => toScreen(p, fit))));
-  }
+  // Hand tracking: every landmark of every hand, in screen pixels
+  const fit = coverFit(video, innerWidth, innerHeight);
+  hands = shell.track(now).map((h) => handArea(h.raw.map((p) => toScreen(p, fit))));
 
   // Spawn and move bubbles
   const remaining = Math.max(0, endTime - now);
@@ -205,14 +124,8 @@ function loop(now) {
 // ---------- drawing ----------
 
 function drawFrame() {
-  const fit = coverFit();
-
   // Mirrored camera feed
-  ctx.save();
-  ctx.translate(innerWidth, 0);
-  ctx.scale(-1, 1);
-  ctx.drawImage(video, fit.dx, fit.dy, fit.dw, fit.dh);
-  ctx.restore();
+  drawVideo(ctx, video, coverFit(video, innerWidth, innerHeight));
   ctx.fillStyle = 'rgba(11, 16, 32, 0.25)';
   ctx.fillRect(0, 0, innerWidth, innerHeight);
 

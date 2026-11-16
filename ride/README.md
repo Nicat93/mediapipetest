@@ -34,12 +34,13 @@ and the angle between your wrists becomes the handlebar: tilt it like a steering
 
 ## Phone as webcam
 
-1. On the computer open the game and click **Use phone as camera**. A QR code and a 6-letter code appear.
-2. Scan the QR code with the phone (or open `…/mediapipetest/ride/phone.html` and type the code).
+1. On the computer open the game, pick **Phone (Wi‑Fi)** in the **Camera** list on the menu and click **Ride with camera**
+   (or **Drive with camera**). A QR code and a 6-letter code appear.
+2. Scan the QR code with the phone (or open `…/mediapipetest/common/phone.html` and type the code).
 3. Allow camera access on the phone and prop it up 1.5–2 m away, facing you. **Switch camera** toggles front/back.
 4. The computer starts the handlebar calibration as soon as the video arrives.
 
-How it works: the phone page (`phone.html`) sends its camera stream to the game page with WebRTC.
+How it works: the shared phone page (`common/phone.html`, used by every game) sends its camera stream to the game page with WebRTC.
 [PeerJS](https://peerjs.com/)'s free public server (`0.peerjs.com`) is only used to exchange connection details
 (the pairing code and network addresses); the video itself travels directly between the two devices.
 
@@ -47,7 +48,7 @@ Notes:
 - Both devices should be on the same Wi-Fi. Guest or corporate networks that isolate clients can block the
   direct connection; no TURN relay is configured.
 - Phones only allow camera access on https pages, so pair through the GitHub Pages URL rather than a local server.
-- If the phone disconnects, the game pauses and shows the code again; reopen the link or tap **Reconnect** on the phone.
+- If the phone disconnects, the game pauses until its video comes back; tap **Reconnect** on the phone.
 
 ## Play on GitHub Pages
 
@@ -71,12 +72,13 @@ from the repository root, then open http://localhost:8000/ride/ (camera access i
 
 | File | Purpose |
 | --- | --- |
-| `index.html`, `car.html`, `style.css` | Bike and car pages (`<body data-vehicle>` picks the vehicle), HUD and menus |
+| `index.html`, `car.html`, `style.css` | Bike and car pages (`<body data-vehicle>` picks the vehicle), menu, HUD and in-game panels |
 | `js/main.js` | Game flow (menu → calibrate → countdown → ride → game over), input, sound, view toggle, settings (steering, lives) |
 | `js/game.js` | Three.js world, bike/car models and per-vehicle tuning (`VEHICLES`), obstacles, collisions, chase and first-person cameras |
-| `js/pose.js` | Video source (webcam or phone stream) + MediaPipe Pose Landmarker, wrist angle → steering |
-| `js/phonelink.js` | PC side of the phone link: pairing code, QR code, receiving the WebRTC stream |
-| `phone.html`, `phone.css`, `js/phone.js` | Phone side: opens the camera and streams it to the PC |
+| `js/pose.js` | Wrist angle → steering, on top of the shared `PoseTracker` |
+| `phone.html` | Old address of the phone page; forwards to `common/phone.html` |
 
-Libraries (Three.js 0.160, MediaPipe tasks-vision 0.10.14, PeerJS 1.5.4, qrcode-generator 1.4.4) and the pose model load from CDNs, so there is no build step.
+The menu, camera picker (PC camera or phone), phone pairing, loading and MediaPipe come from [`../common/`](../common/)
+(see [`docs/NEW_GAME.md`](../docs/NEW_GAME.md)). Libraries (Three.js 0.160, MediaPipe tasks-vision 1.2.3,
+PeerJS 1.5.4, qrcode-generator 1.4.4) and the pose model load from CDNs, so there is no build step.
 Steering defaults per game are in `DEFAULTS` in `js/main.js`; players change them in the settings panel.

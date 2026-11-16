@@ -2,14 +2,11 @@
 // Pick a firefighter pup or a police pup; the pup copies your body. Step
 // left/right to switch lanes around the cones, duck under the bridges, and
 // collect bones. Slower than Neon Dash, with infinite lives by default.
-import { FilesetResolver, PoseLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/vision_bundle.mjs';
-import { createCamera } from './camera.js';
+import { PoseTracker } from '../../common/tracking.js';
+import { createShell } from '../../common/shell.js';
 import { livesPicker, heartsText } from './lives.js';
 import { sfx, unlock, startAmbience, stopAmbience, soundButton } from './sound.js';
 
-const WASM_PATH = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm';
-const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
 
 // Pose landmark indices
 const NOSE = 0, L_SH = 11, R_SH = 12, L_WR = 15, R_WR = 16, L_HIP = 23, R_HIP = 24, L_ANK = 27, R_ANK = 28;
@@ -38,12 +35,11 @@ const COLORS = {
 const BEST_KEY = 'puprescue.best';
 const PUP_KEY = 'puprescue.pup';
 
-const video = document.getElementById('cam');
-const canvas = document.getElementById('game');
+const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
-const overlay = document.getElementById('overlay');
+const titleEl = document.getElementById('title');
+const playLabel = document.querySelector('#play .label');
 const msg = document.getElementById('msg');
-const startBtn = document.getElementById('start');
 const hud = document.getElementById('hud');
 const scoreEl = document.getElementById('score');
 const distEl = document.getElementById('dist');
@@ -51,10 +47,7 @@ const livesEl = document.getElementById('lives');
 const getMaxLives = livesPicker(document.getElementById('lives-pick'), 'puprescue.lives', Infinity);
 let maxLives = getMaxLives();
 
-let landmarker = null;
 let looping = false;
-let wantStart = false;
-let lastVideoTime = -1;
 
 // Tracking
 // Coordinates are in units of the video height (x: 0..aspect, y: 0..1), so they
@@ -93,7 +86,7 @@ for (const b of pupButtons) {
     c.clearRect(0, 0, cv.width, cv.height);
     drawDogFront(c, cv.width / 2, cv.height - 8 * dpr, u, b.dataset.pup, t);
   };
-  const tick = (now) => { if (!overlay.hidden) draw(now / 1000); requestAnimationFrame(tick); };
+  const tick = (now) => { if (shell.mode === 'off') draw(now / 1000); requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }
 choosePup(pupKind);
@@ -109,63 +102,24 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-async function createLandmarker() {
-  const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
-  const opts = (delegate) => ({
-    baseOptions: { modelAssetPath: MODEL_URL, delegate },
-    runningMode: 'VIDEO',
-    numPoses: 1,
-  });
-  try {
-    return await PoseLandmarker.createFromOptions(fileset, opts('GPU'));
-  } catch (err) {
-    console.warn('GPU delegate failed, falling back to CPU', err);
-    return await PoseLandmarker.createFromOptions(fileset, opts('CPU'));
-  }
-}
-
-const camera = createCamera({
-  video,
-  select: document.getElementById('camera'),
-  linkEl: document.getElementById('link'),
-  onAttach: () => (lastVideoTime = -1),
-  onPhoneReady: () => wantStart && state === 'idle' && tryStart(),
-  onError: (text) => (msg.textContent = text),
-  isActive: () => state !== 'idle',
+// Start screen, camera picker (PC or phone), loading and errors: ../../common/shell.js
+const shell = createShell({
+  lang: 'en',
+  unlock: () => { unlock(); }, // browsers only allow sound after a click
+  tracker: (v) => new PoseTracker(v, { model: 'full', smooth: false }),
+  onPlay: () => newGame(),
 });
-
-async function tryStart() {
-  if (!landmarker) {
-    msg.textContent = 'Loading body tracking…';
-    landmarker = await createLandmarker();
-  }
-  msg.textContent = camera.usingPhone() ? 'Connecting to your phone…' : 'Starting camera…';
-  if (!(await camera.start())) {
-    wantStart = true;
-    msg.textContent = 'Waiting for your phone. Scan the QR code below with it (or open the address and type the code), then allow the camera.';
-    return;
-  }
-  wantStart = false;
-  newGame();
-}
-
+const video = shell.video;
+document.getElementById('play').addEventListener('click', () => shell.play());
 soundButton(document.getElementById('sound'));
 
-startBtn.addEventListener('click', async () => {
-  unlock(); // browsers only allow sound after a click
-  startBtn.disabled = true;
-  try {
-    await tryStart();
-  } catch (err) {
-    console.error(err);
-    msg.textContent =
-      err?.name === 'NotAllowedError'
-        ? 'Camera permission was denied. Allow camera access for this site in your browser settings, then reload.'
-        : `Couldn't start: ${err?.message || err}`;
-  } finally {
-    startBtn.disabled = false;
-  }
-});
+// Newest body landmarks: undefined when there's no new camera frame, null when nobody is in view.
+function poseFrame(now) {
+  const t = shell.tracker;
+  if (shell.mode !== 'camera' || !t) return undefined;
+  t.update(now);
+  return t.fresh ? t.result.landmarks?.[0] ?? null : undefined;
+}
 
 // ---------- game flow ----------
 
@@ -177,8 +131,6 @@ function newGame() {
   objects = []; effects = []; gt = 0; distance = 0; speed = 0; nextRowIn = 0; decorIn = 0;
   for (let z = 2; z < SPAWN_Z; z += 7) spawnDecor(z);
   lane = 0; laneVis = 0; bodyX = 0; base = null; calib = [];
-  overlay.hidden = true;
-  hud.hidden = false;
   updateHud();
   setState('frame');
   if (!looping) {
@@ -195,11 +147,10 @@ function gameOver() {
   let best = score;
   try { best = Math.max(score, Number(localStorage.getItem(BEST_KEY)) || 0); localStorage.setItem(BEST_KEY, best); } catch {}
   setTimeout(() => {
-    hud.hidden = true;
-    overlay.querySelector('h1').textContent = 'Great job, pup!';
+    titleEl.textContent = 'Great job, pup!';
     msg.textContent = `You ran ${Math.floor(distance)} m and found ${coins} bones! Score ${score} (best ${best}). Play again?`;
-    startBtn.textContent = 'Play again';
-    overlay.hidden = false;
+    playLabel.textContent = 'Play again';
+    shell.home('', { keepGame: true }); // menu over the game, camera stays on
     setState('idle');
   }, 2000);
 }
@@ -216,9 +167,8 @@ const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 function track(now) {
-  if (video.readyState < 2 || video.currentTime === lastVideoTime) return;
-  lastVideoTime = video.currentTime;
-  const lms = landmarker.detectForVideo(video, now).landmarks?.[0];
+  const lms = poseFrame(now);
+  if (lms === undefined) return; // no new camera frame
   if (!lms) { pose = null; m = null; return; }
 
   const aspect = (video.videoWidth || 640) / (video.videoHeight || 480);

@@ -20,7 +20,7 @@ Pick the camera on each game's start screen; the choice is shared by all three g
 
 - **PC camera**: any webcam the browser sees, including phone-as-USB-webcam apps.
 - **Phone (Wi‑Fi)**: a QR code and a 6-letter code appear. Scan the QR code with the phone (or open
-  `…/arcade/phone.html` and type the code), allow the camera and prop the phone up facing you.
+  `…/common/phone.html` and type the code), allow the camera and prop the phone up facing you.
   The video goes straight from phone to PC over WebRTC. The free PeerJS server is only used to exchange
   connection details, so both devices need internet access and the same Wi‑Fi network.
 
@@ -29,9 +29,11 @@ Pick the camera on each game's start screen; the choice is shared by all three g
 - `bubble-pop.html`, `body-blitz.html`, `neon-dash.html`, `pup-rescue.html`, `style.css`: game pages
 - `js/bubble-pop.js`, `js/body-blitz.js`, `js/neon-dash.js`, `js/pup-rescue.js`: the games
 - `js/lives.js`: the Lives picker
-- `js/camera.js`: camera picker shared by the games (PC cameras + phone); the newer games use it through `common/shell.js`
-- `js/phonelink.js`, `phone.html`, `phone.css`, `js/phone.js`: phone-as-camera pairing (same approach as `ride/`)
+- `js/sound.js`: sound effects and ambience for Neon Dash and Pup Rescue Run
+- `phone.html`: old address of the phone page; forwards to `common/phone.html`
 
+The menus, camera picker, phone pairing, loading and MediaPipe trackers come from [`../common/`](../common/)
+(see [`docs/NEW_GAME.md`](../docs/NEW_GAME.md)): Bubble Pop uses `HandTracker`, the others `PoseTracker`.
 MediaPipe (`@mediapipe/tasks-vision` 1.2.3) and the models load from CDNs, so no build step is needed.
 
 These games started as a Vite project with a dev-server relay for the phone link. Here they are plain

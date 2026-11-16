@@ -79,7 +79,18 @@ On any error it returns to the start screen with a readable message.
 | `shell.video` | the camera `<video>` element |
 | `shell.setMessage(text)` | writes under the camera picker |
 
-The picker and pairing themselves are `arcade/js/camera.js` and `arcade/js/phonelink.js`. The phone page is `arcade/phone.html`, shared by all games. The saved camera choice is shared too.
+The picker and pairing themselves are `common/camera.js` and `common/phonelink.js`. The phone page is `common/phone.html`, shared by all games (`arcade/phone.html` and `ride/phone.html` just forward to it). The saved camera choice is shared too.
+
+More options and patterns:
+
+| Need | How |
+| --- | --- |
+| "Game over, play again?" menu over the last frame, camera kept on | `shell.home('', { keepGame: true })`, then change the start screen's title / text / button label yourself. The arcade games do this. |
+| Status messages somewhere else (e.g. the picker is inside a closed Grown-ups box) | Put `<p class="msg kit-msg" role="status"></p>` where you want them; the shell uses it. Pup Rescue Run does this. |
+| Custom preview badge text | `badge: (found, tracker) => ['Hands ✓', true]` |
+| Your own tracker class | Anything with `kind`, `load()`, `update(now)` and `reset()` works, e.g. a wrapper around `PoseTracker` (see `ride/js/pose.js`). |
+| Your own in-game panels (calibrate, pause) | Keep them in the game; the shell only does start ⇄ game. Pose Rider does this. |
+| Act only on new camera frames (your own smoothing) | After `tracker.update(now)`, `tracker.fresh` is true on a new frame and `tracker.result` holds MediaPipe's raw result. |
 
 ## `common/tracking.js`: MediaPipe
 
@@ -119,7 +130,7 @@ PoseTracker works the same way for the body:
 new PoseTracker(video, { model: 'lite' | 'full', smooth: {...} | false })
 ```
 
-`update(now)` returns `[{ lm, world, raw }]`:
+`update(now)` returns `[{ lm, world, raw }]` (and sets `fresh` / `result` like HandTracker):
 - `lm`: 33 points, camera units, not mirrored. Names are in `POSE` (`POSE.L_WRIST`, …).
 - `world`: metres, hip-centred.
 
@@ -138,6 +149,9 @@ const back = toCamera(p, fit);             // inverse (handy in tests)
 
 - `OneEuro`: smooth any value. `new OneEuro(minCutoff, beta).filter(v, timeMs)`. A lower `minCutoff` is steadier when the hand is still; a higher `beta` lags less when it moves fast.
 - `HandTracker.openness(lm)` and `HandTracker.palm(lm)`.
+- **Frozen video:** when a phone's video stops arriving (track muted), both trackers stop reporting instead of tracking the last frozen frame.
+- **Version:** MediaPipe tasks-vision is pinned in `VISION_URL` (1.2.3). Change it there and every game follows.
+- **Extra preview drawing:** `afterDraw: (ctx, landmarksList, canvas) => {}` draws on top of the preview skeleton.
 
 ## `common/fx.js`: everything else
 
@@ -185,6 +199,10 @@ Re-skin a game by overriding variables in its own `style.css`. Little Chef is th
 }
 ```
 
+Ready-made themes: the default (light, purple), `<body class="theme-neon">` (dark arcade look: Bubble Pop, Body Blitz,
+Neon Dash). Pup Rescue Run (`.pup-theme` in `arcade/style.css`) and Pose Rider (`ride/style.css`) show how to
+make another one with the variables, including `--start-bg` for a start screen that sits over a live game scene.
+
 | Class | What it is |
 | --- | --- |
 | `.big` / `.big.alt` | Start buttons |
@@ -193,6 +211,7 @@ Re-skin a game by overriding variables in its own `style.css`. Little Chef is th
 | `.go` | Green and pulsing, for "next" |
 | `.hb` | Shows the dwell ring |
 | `.hidden` | `display: none` |
+| `.games-nav` | Row of links to other games under the start screen |
 | `.em` / `.ico` | Use the emoji font |
 
 The keyframes `kit-pop`, `kit-pulse`, `kit-bob` and `kit-spin` are available to games too.

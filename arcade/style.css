@@ -1,20 +1,8 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* Arcade games. Menus, camera picker, loading and buttons come from
+   ../common/kit.css (dark "theme-neon", or the bright Pup Rescue theme below);
+   this file has the in-game parts. */
 
-html, body {
-  height: 100%;
-  overflow: hidden;
-  background: #0b1020;
-  color: #fff;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Camera is hidden; the game canvas draws the (mirrored) video itself. */
-#cam { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-
-#game { position: fixed; inset: 0; width: 100vw; height: 100dvh; display: block; }
+#stage { position: fixed; inset: 0; width: 100vw; height: 100dvh; display: block; }
 
 #hud {
   position: fixed;
@@ -25,114 +13,68 @@ html, body {
   justify-content: space-between;
   font-size: 28px;
   font-weight: 700;
+  color: #fff;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
-#hud[hidden] { display: none; }
 #score::before { content: "Score "; font-weight: 400; opacity: 0.8; }
 #time::after { content: "s"; font-weight: 400; opacity: 0.8; }
-
-#overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  padding: 24px;
-  text-align: center;
-  background: rgba(11, 16, 32, 0.82);
-}
-#overlay[hidden] { display: none; }
-#overlay h1 { font-size: 44px; }
-#overlay p { max-width: 340px; font-size: 18px; line-height: 1.4; opacity: 0.9; }
-
-#start {
-  font: inherit;
-  font-size: 22px;
-  font-weight: 700;
-  padding: 14px 44px;
-  border: 0;
-  border-radius: 999px;
-  background: #4cc9f0;
-  color: #0b1020;
-}
-#start:disabled { opacity: 0.5; }
 
 /* Body Blitz HUD: score · multiplier · lives */
 .body-hud #mult { color: #ff9f1c; }
 .body-hud #lives { color: #ff3b5c; letter-spacing: 4px; }
-.body-hud #score::before { content: "Score "; }
 .c-hand { color: #4cc9f0; }
 .c-foot { color: #ff9f1c; }
 .c-laser { color: #ff3b5c; }
 .c-coin { color: #ffd23f; }
-.games { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
-.games .other-game::after { content: " →"; }
 
-.other-game { color: #4cc9f0; font-size: 16px; text-decoration: none; opacity: 0.85; }
-.other-game:hover { text-decoration: underline; }
+#start .tag { max-width: 520px; font-size: 19px; line-height: 1.45; }
+#start .cam-pick select { min-width: 120px; }
 
-#link { display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
-#link[hidden] { display: none; }
-#link.ok .state { color: #7ee787; }
-#link.ok .url { display: none; }
-#link .url {
-  font-size: 18px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: #141b33;
-  user-select: all;
+/* Sound on/off button (Neon Dash, Pup Rescue Run): stays above the menus */
+.sound-btn {
+  position: fixed;
+  left: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 20;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+  font-family: var(--emoji-font);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
 }
-
-.cam-pick { display: flex; flex-direction: column; gap: 6px; font-size: 14px; opacity: 0.9; }
-#camera, #lives-pick {
-  font: inherit;
-  font-size: 16px;
-  max-width: min(360px, 90vw);
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid #4cc9f0;
-  background: #141b33;
-  color: #fff;
-}
-
-#link .qr { width: 168px; max-width: 50vw; align-self: center; background: #fff; border-radius: 10px; padding: 6px; }
-#link .qr:empty, #link .qr[hidden] { display: none; }
-#link .qr svg { display: block; width: 100%; height: auto; }
 
 /* ---------- Pup Rescue Run: bright, kid-friendly theme ---------- */
-.pup-theme { background: #4fb8ff; font-family: "Baloo 2", system-ui, sans-serif; }
-.pup-theme #overlay {
-  background: linear-gradient(180deg, rgba(79, 184, 255, 0.93), rgba(200, 240, 255, 0.93));
-  color: #1d3557;
-  overflow-y: auto;
-  justify-content: flex-start;
-  padding-top: max(24px, 4vh);
+.pup-theme {
+  --ink: #1d3557;
+  --muted: #3d5a80;
+  --accent: #ff5a5f;
+  --accent-dark: #b8323a;
+  --title: #ff8c42;
+  --title-shadow: #1d3557;
+  --link: #1d3557;
+  --card: #fff;
+  --spinner-track: #cdeeff;
+  --loading-bg: rgba(200, 240, 255, 0.93);
+  --error: #c1121f;
+  --start-bg: linear-gradient(180deg, rgba(79, 184, 255, 0.93), rgba(200, 240, 255, 0.93));
+  --font: "Baloo 2", system-ui, sans-serif;
+  background: #4fb8ff;
 }
-.pup-theme #overlay h1 {
+.pup-theme #start h1 {
   font-size: clamp(40px, 8vw, 64px);
-  line-height: 1;
-  color: #ff8c42;
   -webkit-text-stroke: 2px #1d3557;
   paint-order: stroke fill;
-  text-shadow: 0 4px 0 #1d3557;
 }
-.pup-theme #overlay p { max-width: 460px; font-size: 20px; opacity: 1; }
+.pup-theme #start .tag { font-size: 20px; }
 .pup-theme .c-laser { color: #e63946; }
 .pup-theme .c-coin { color: #b5651d; }
-.pup-theme #start {
-  font-family: inherit;
-  font-size: 30px;
-  font-weight: 800;
-  padding: 10px 64px;
-  background: #ff5a5f;
-  color: #fff;
-  box-shadow: 0 6px 0 #b8323a;
-}
-.pup-theme #start:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8323a; }
-.pup-pick { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.pup-pick { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
 .pup-pick button {
   font: inherit;
   font-size: 22px;
@@ -160,27 +102,7 @@ html, body {
   .pup-pick button { font-size: 16px; padding: 6px 8px 4px; }
   .pup-pick button canvas { width: 84px; height: 105px; }
 }
-.grown-ups { max-width: 460px; font-size: 16px; }
-.grown-ups summary { cursor: pointer; opacity: 0.8; }
-.grown-ups[open] { display: flex; flex-direction: column; gap: 12px; align-items: center; }
-.grown-ups p { font-size: 16px !important; }
-.pup-theme .other-game { color: #1d3557; }
+.pup-theme details.grown-ups { font-size: 16px; color: var(--ink); }
+.pup-theme details.grown-ups[open] { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .pup-theme #hud { color: #fff; -webkit-text-stroke: 1px #1d3557; paint-order: stroke fill; font-family: "Baloo 2", system-ui, sans-serif; }
 .pup-theme .body-hud #lives { color: #ff5a5f; }
-
-/* Sound on/off button (Neon Dash, Pup Rescue Run) */
-.sound-btn {
-  position: fixed;
-  left: 16px;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 5;
-  width: 52px;
-  height: 52px;
-  border: 0;
-  border-radius: 50%;
-  font-size: 26px;
-  line-height: 1;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
-  cursor: pointer;
-}

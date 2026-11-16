@@ -64,6 +64,7 @@ const el = (tag, props = {}, ...kids) => {
  * @param {boolean|'corner'} [o.preview]  show a small mirrored camera picture with the skeleton while playing
  * @param {boolean} [o.touch]     the game also has a touch mode (adds "play with touch" to camera errors)
  * @param {() => void} [o.unlock] called on every play click (e.g. sound.unlock)
+ * @param {(found: any[], tracker: object) => [string, boolean]} [o.badge]  text and ok-state for the preview badge
  */
 export function createShell(o) {
   const t = { ...STRINGS[o.lang || 'en'], ...o.strings };
@@ -76,8 +77,12 @@ export function createShell(o) {
     new Option('PC camera', ''), new Option('Phone (Wi‑Fi)', 'phone'));
   const linkEl = el('div', { className: 'kit-link', id: 'link', hidden: true },
     el('span', { className: 'state' }), el('span', { className: 'url' }));
-  const msgEl = el('p', { className: 'msg', id: 'start-msg', role: 'status' });
-  slot.replaceChildren(el('label', { className: 'cam-pick' }, `${t.camera} `, select), linkEl, msgEl);
+  // Messages go under the picker, or into an element with class "kit-msg" if the page has one
+  // (handy when the picker sits inside a closed Grown-ups box).
+  const ownMsg = start.querySelector('.kit-msg');
+  const msgEl = ownMsg || el('p', { className: 'msg kit-msg', role: 'status' });
+  msgEl.id ||= 'start-msg';
+  slot.replaceChildren(el('label', { className: 'cam-pick' }, `${t.camera} `, select), linkEl, ...(ownMsg ? [] : [msgEl]));
 
   const loadingText = el('p', { textContent: t.loading });
   const loading = el('div', { className: 'kit-loading hidden', role: 'status' }, el('div', { className: 'spinner' }), loadingText);
@@ -88,7 +93,7 @@ export function createShell(o) {
   const video = el('video', { id: 'cam-video', playsInline: true, muted: true });
   if (o.preview) {
     previewCanvas = el('canvas');
-    badge = el('div', { className: 'kit-badge', textContent: '✋ ?' });
+    badge = el('div', { className: 'kit-badge', textContent: '…' });
     preview = el('div', { className: 'kit-preview hidden' }, video, previewCanvas, badge);
     document.body.append(preview);
   } else {
@@ -117,7 +122,7 @@ export function createShell(o) {
     preview?.classList.toggle('hidden', !withCamera);
   }
 
-  const cameraReady = import('../arcade/js/camera.js')
+  const cameraReady = import('./camera.js')
     .then(({ createCamera }) => {
       camera = createCamera({
         video,
@@ -159,6 +164,7 @@ export function createShell(o) {
           waiting = true;
           pendingArg = arg;
           setMsg(t.waitPhone);
+          linkEl.closest('details')?.setAttribute('open', '');
           linkEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return false;
         }
@@ -187,15 +193,21 @@ export function createShell(o) {
       o.onPlay({ camera: false, arg });
     },
 
-    /** Back to the start screen (stops the camera). */
-    home(message = '') {
+    /**
+     * Back to the start screen (stops the camera).
+     * keepGame: leave the game screen showing under the start screen and the
+     * camera running (a "Game over, play again?" menu over the last frame).
+     */
+    home(message = '', { keepGame = false } = {}) {
       const wasPlaying = mode !== 'off';
       mode = 'off';
       waiting = false;
       window.speechSynthesis?.cancel();
-      camera?.stop();
-      tracker?.reset();
-      game.classList.add('hidden');
+      if (!keepGame) {
+        camera?.stop();
+        tracker?.reset();
+        game.classList.add('hidden');
+      }
       preview?.classList.add('hidden');
       start.classList.remove('hidden');
       setMsg(message);
@@ -207,13 +219,17 @@ export function createShell(o) {
       if (mode !== 'camera' || !tracker) return [];
       const found = tracker.update(now);
       if (badge) {
-        badge.textContent = found.length ? (tracker.kind === 'pose' ? '🧍 ✓' : '✋ ✓') : (tracker.kind === 'pose' ? '🧍 ?' : '✋ ?');
-        badge.classList.toggle('ok', found.length > 0);
+        const icon = tracker.kind === 'pose' ? '🧍' : '✋';
+        const [text, ok] = o.badge ? o.badge(found, tracker) : [`${icon} ${found.length ? '✓' : '?'}`, found.length > 0];
+        if (badge.textContent !== text) badge.textContent = text;
+        badge.classList.toggle('ok', ok);
       }
       return found;
     },
 
     setMessage: setMsg,
+    /** The preview box (or null), e.g. to restyle it for a portrait phone camera. */
+    preview,
   };
   return shell;
 }

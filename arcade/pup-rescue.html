@@ -8,23 +8,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../common/kit.css" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body class="pup-theme">
-    <video id="cam" playsinline muted autoplay></video>
-    <canvas id="game"></canvas>
-
-    <div id="hud" class="body-hud" hidden>
-      <span id="score">0</span>
-      <span id="dist">0 m</span>
-      <span id="lives"></span>
-    </div>
+    <!-- start screen, camera picker, loading: ../common (docs/NEW_GAME.md) -->
+    <section id="game" class="screen hidden">
+      <canvas id="stage"></canvas>
+      <div id="hud" class="body-hud">
+        <span id="score">0</span>
+        <span id="dist">0 m</span>
+        <span id="lives"></span>
+      </div>
+    </section>
 
     <button id="sound" class="sound-btn" type="button" aria-label="Sound on/off">🔊</button>
 
-    <div id="overlay">
-      <h1>Pup Rescue Run</h1>
-      <p id="msg">
+    <section id="start" class="screen">
+      <h1 id="title">Pup Rescue Run</h1>
+      <p class="tag" id="msg">
         Pick your pup! Then <b>step left and right</b> to run around the cones,
         <b class="c-laser">duck down</b> under the bridges and collect the <b class="c-coin">bones</b>.
       </p>
@@ -35,28 +37,21 @@
         <button type="button" data-pup="builder" aria-pressed="false"><canvas aria-hidden="true"></canvas><span>Builder pup</span></button>
         <button type="button" data-pup="water" aria-pressed="false"><canvas aria-hidden="true"></canvas><span>Water pup</span></button>
       </div>
-      <button id="start">Start</button>
+      <div class="start-buttons">
+        <button id="play" class="big"><span class="ico" aria-hidden="true">▶️</span><span class="label">Start</span><small>run, pup, run!</small></button>
+      </div>
+      <p class="msg kit-msg" role="status"></p>
       <details class="grown-ups">
         <summary>For grown-ups</summary>
         <p>Stand 2–3 m from the camera so the whole body is in view. The game is slow and gentle, with infinite lives by default.</p>
-        <label class="cam-pick">
-          Camera
-          <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
-        </label>
-        <label class="cam-pick">
-          Lives
-          <select id="lives-pick"><option value="inf">∞ Infinite</option></select>
-        </label>
-        <div id="link" hidden>
-          <span class="state">Getting a pairing code…</span>
-          <code class="url">…</code>
-        </div>
-        <nav class="games">
-          <a class="other-game" href="neon-dash.html">Neon Dash</a>
-          <a class="other-game" href="../">All games</a>
+        <div class="kit-camera"></div>
+        <label class="cam-pick">Lives <select id="lives-pick"><option value="inf">∞ Infinite</option></select></label>
+        <nav class="games-nav">
+          <a href="neon-dash.html">Neon Dash</a>
+          <a href="../">All games</a>
         </nav>
       </details>
-    </div>
+    </section>
 
     <script type="module" src="js/pup-rescue.js"></script>
   </body>

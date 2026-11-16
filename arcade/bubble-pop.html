@@ -5,35 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#0b1020" />
     <title>Bubble Pop</title>
+    <link rel="stylesheet" href="../common/kit.css" />
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
-    <video id="cam" playsinline muted autoplay></video>
-    <canvas id="game"></canvas>
-
-    <div id="hud" hidden>
-      <span id="score">0</span>
-      <span id="time">60</span>
-    </div>
-
-    <div id="overlay">
-      <h1>Bubble Pop</h1>
-      <p id="msg">Pick your camera, step back a little, and pop bubbles with your hands.</p>
-      <label class="cam-pick">
-        Camera
-        <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
-      </label>
-      <div id="link" hidden>
-        <span class="state">Getting a pairing code…</span>
-        <code class="url">…</code>
+  <body class="theme-neon">
+    <!-- start screen, camera picker, loading: ../common (docs/NEW_GAME.md) -->
+    <section id="game" class="screen hidden">
+      <canvas id="stage"></canvas>
+      <div id="hud">
+        <span id="score">0</span>
+        <span id="time">60</span>
       </div>
-      <button id="start">Start</button>
-      <nav class="games">
-        <a class="other-game" href="neon-dash.html">Neon Dash (full body)</a>
-        <a class="other-game" href="body-blitz.html">Body Blitz (full body)</a>
-        <a class="other-game" href="../">All games</a>
+    </section>
+
+    <section id="start" class="screen">
+      <div class="logo" aria-hidden="true">🫧</div>
+      <h1 id="title">Bubble Pop</h1>
+      <p class="tag" id="msg">
+        Pick your camera, step back a little, and pop bubbles with your hands.
+      </p>
+      <div class="start-buttons">
+        <button id="play" class="big"><span class="ico" aria-hidden="true">▶️</span><span class="label">Start</span><small>60 seconds</small></button>
+      </div>
+      <div class="kit-camera"></div>
+      <nav class="games-nav">
+        <a href="neon-dash.html">Neon Dash</a>
+        <a href="body-blitz.html">Body Blitz</a>
+        <a href="pup-rescue.html">Pup Rescue Run</a>
+        <a href="../">All games</a>
       </nav>
-    </div>
+    </section>
 
     <script type="module" src="js/bubble-pop.js"></script>
   </body>

@@ -5,44 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#0b1020" />
     <title>Body Blitz</title>
+    <link rel="stylesheet" href="../common/kit.css" />
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
-    <video id="cam" playsinline muted autoplay></video>
-    <canvas id="game"></canvas>
+  <body class="theme-neon">
+    <!-- start screen, camera picker, loading: ../common (docs/NEW_GAME.md) -->
+    <section id="game" class="screen hidden">
+      <canvas id="stage"></canvas>
+      <div id="hud" class="body-hud">
+        <span id="score">0</span>
+        <span id="mult">x1</span>
+        <span id="lives"></span>
+      </div>
+    </section>
 
-    <div id="hud" class="body-hud" hidden>
-      <span id="score">0</span>
-      <span id="mult">x1</span>
-      <span id="lives"></span>
-    </div>
-
-    <div id="overlay">
-      <h1>Body Blitz</h1>
-      <p id="msg">
+    <section id="start" class="screen">
+      <div class="logo" aria-hidden="true">🥊</div>
+      <h1 id="title">Body Blitz</h1>
+      <p class="tag" id="msg">
         Stand 2–3 m back so your whole body is in view.
         Hit <b class="c-hand">blue</b> targets with your hands, <b class="c-foot">orange</b> ones with your feet,
         and <b class="c-laser">duck</b> under the red lasers.
       </p>
-      <label class="cam-pick">
-        Camera
-        <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
-      </label>
-      <label class="cam-pick">
-        Lives
-        <select id="lives-pick"><option value="3">3</option></select>
-      </label>
-      <div id="link" hidden>
-        <span class="state">Getting a pairing code…</span>
-        <code class="url">…</code>
+      <div class="start-buttons">
+        <button id="play" class="big"><span class="ico" aria-hidden="true">▶️</span><span class="label">Start</span><small>full body</small></button>
       </div>
-      <button id="start">Start</button>
-      <nav class="games">
-        <a class="other-game" href="bubble-pop.html">Bubble Pop</a>
-        <a class="other-game" href="neon-dash.html">Neon Dash</a>
-        <a class="other-game" href="../">All games</a>
+      <div class="kit-camera"></div>
+      <label class="cam-pick">Lives <select id="lives-pick"><option value="3">3</option></select></label>
+      <p class="msg kit-msg" role="status"></p>
+      <nav class="games-nav">
+        <a href="bubble-pop.html">Bubble Pop</a>
+        <a href="neon-dash.html">Neon Dash</a>
+        <a href="pup-rescue.html">Pup Rescue Run</a>
+        <a href="../">All games</a>
       </nav>
-    </div>
+    </section>
 
     <script type="module" src="js/body-blitz.js"></script>
   </body>
