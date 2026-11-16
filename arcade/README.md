@@ -29,7 +29,7 @@ Pick the camera on each game's start screen; the choice is shared by all three g
 - `bubble-pop.html`, `body-blitz.html`, `neon-dash.html`, `pup-rescue.html`, `style.css`: game pages
 - `js/bubble-pop.js`, `js/body-blitz.js`, `js/neon-dash.js`, `js/pup-rescue.js`: the games
 - `js/lives.js`: the Lives picker
-- `js/camera.js`: camera picker shared by the games (PC cameras + phone)
+- `js/camera.js`: camera picker shared by the games (PC cameras + phone); the newer games use it through `common/shell.js`
 - `js/phonelink.js`, `phone.html`, `phone.css`, `js/phone.js`: phone-as-camera pairing (same approach as `ride/`)
 
 MediaPipe (`@mediapipe/tasks-vision` 1.2.3) and the models load from CDNs, so no build step is needed.

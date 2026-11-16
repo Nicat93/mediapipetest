@@ -1,0 +1,240 @@
+/* Shared look for the kids' camera games: base, start screen, camera picker,
+   loading overlay, tool buttons, hand-dwell rings, camera preview, confetti.
+   Link it BEFORE the game's own style.css; a game re-skins it by overriding
+   the variables below in its own :root. See docs/NEW_GAME.md. */
+
+:root {
+  --ink: #2f2a4a;
+  --muted: #6e6890;
+  --bg1: #e3f6ff;
+  --bg2: #fff1d6;
+  --accent: #7b5cff;       /* main button, titles */
+  --accent-dark: #5a3fe0;
+  --alt: #ff8a3d;          /* second start button */
+  --alt-dark: #d96a1f;
+  --go: #2fb36d;           /* "good / next" */
+  --go-dark: #22895a;
+  --gold: #ffb703;         /* focus ring, dwell ring */
+  --card: #fff;
+  --tool-shadow: #d8d2f0;
+  --spinner-track: #ddd3ff;
+  --loading-bg: rgba(227, 246, 255, 0.92);
+  --error: #d43d6a;
+  --font: "Baloo 2", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --title-font: var(--font);
+  --title-weight: 800;
+  --emoji-font: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: 600;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.7) 0 60px, transparent 61px),
+    radial-gradient(circle at 85% 75%, rgba(255, 255, 255, 0.55) 0 90px, transparent 91px),
+    linear-gradient(160deg, var(--bg1), var(--bg2));
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+.em, .ico, .tool, .logo, .kit-cursor, .kit-particle, .kit-badge { font-family: var(--emoji-font); }
+.hidden { display: none !important; }
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
+
+/* ---------------------------------------------------------- start screen */
+.screen { position: fixed; inset: 0; }
+#start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+#start > * { flex-shrink: 0; }
+#start .logo {
+  font-size: clamp(60px, 13vh, 110px);
+  line-height: 1.1;
+  color: var(--accent);
+  text-shadow: 0 5px 0 #fff;
+  animation: kit-bob 2.4s ease-in-out infinite;
+}
+#start h1 {
+  font-family: var(--title-font);
+  font-weight: var(--title-weight);
+  font-size: clamp(40px, 9vw, 72px);
+  line-height: 1;
+  color: var(--accent-dark);
+  margin: 4px 0 0;
+  text-shadow: 0 4px 0 #fff;
+}
+#start .tag { font-size: 22px; margin: 6px 0 18px; }
+.start-buttons { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+button.big {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 220px;
+  padding: 16px 26px 14px;
+  border-radius: 28px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  box-shadow: 0 7px 0 var(--accent-dark), 0 14px 30px rgba(0, 0, 0, 0.12);
+  transition: transform 0.1s;
+}
+button.big.alt { background: var(--alt); box-shadow: 0 7px 0 var(--alt-dark), 0 14px 30px rgba(0, 0, 0, 0.12); }
+button.big:active { transform: translateY(4px); }
+button.big .ico { font-size: 52px; line-height: 1.15; }
+button.big small { font-size: 15px; font-weight: 600; opacity: 0.92; }
+
+/* camera picker + phone pairing (filled in by shell.js) */
+.kit-camera { display: flex; flex-direction: column; align-items: center; }
+.cam-pick { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: var(--muted); }
+.cam-pick select {
+  font: inherit;
+  font-size: 16px;
+  max-width: min(360px, 80vw);
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  background: #fff;
+  color: var(--ink);
+}
+.kit-link { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; max-width: 560px; }
+.kit-link[hidden] { display: none; }
+.kit-link.ok .state { color: var(--go-dark); }
+.kit-link.ok .url { display: none; }
+.kit-link .url { font-size: 17px; padding: 6px 12px; border-radius: 10px; background: #fff; color: var(--ink); user-select: all; -webkit-user-select: all; }
+.kit-link .qr { width: 168px; max-width: 50vw; background: #fff; border-radius: 10px; padding: 6px; }
+.kit-link .qr:empty, .kit-link .qr[hidden] { display: none; }
+.kit-link .qr svg { display: block; width: 100%; height: auto; }
+#start .msg { min-height: 1.4em; max-width: 560px; margin: 10px 0 0; color: var(--error); font-size: 18px; }
+
+/* grown-ups box and settings */
+details.grown-ups { max-width: 560px; margin-top: 10px; color: var(--muted); font-size: 15px; text-align: left; }
+details.grown-ups summary { cursor: pointer; text-align: center; color: var(--accent-dark); }
+details.grown-ups a { color: var(--accent-dark); }
+.opt { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; margin: 6px 0; color: var(--ink); cursor: pointer; }
+.opt input { width: 22px; height: 22px; accent-color: var(--accent); grid-row: span 2; margin: 2px 0 0; }
+.opt small { grid-column: 2; color: var(--muted); font-size: 13px; }
+
+/* ------------------------------------------------------------ game parts */
+/* square white tool button: 🏠 🔊 ⏭ … */
+.tool {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: 20px;
+  background: #fff;
+  font-size: 30px;
+  box-shadow: 0 5px 0 var(--tool-shadow), 0 8px 16px rgba(0, 0, 0, 0.08);
+}
+.tool:active { transform: translateY(3px); }
+/* round label button */
+.pill {
+  position: relative;
+  padding: 14px 30px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: clamp(22px, 3.4vw, 30px);
+  font-weight: 800;
+  box-shadow: 0 6px 0 var(--accent-dark), 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+.pill.go, .tool.go { background: var(--go); color: #fff; box-shadow: 0 6px 0 var(--go-dark); animation: kit-pulse 1.2s ease-in-out infinite; }
+
+/* hand-dwell ring (HandButtons in fx.js sets --p from 0 to 1) */
+.hb { --p: 0; position: relative; }
+.hb::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(var(--gold) calc(var(--p) * 1turn), transparent 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  padding: 6px;
+  opacity: calc(var(--p) * 10);
+}
+.hb.hot { filter: brightness(1.08); transform: scale(1.05); }
+
+/* hand pointers (HandCursors in fx.js) */
+.kit-cursors { position: fixed; inset: 0; pointer-events: none; z-index: 29; }
+.kit-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 72px;
+  height: 72px;
+  margin: -36px 0 0 -36px;
+  display: grid;
+  place-items: center;
+  font-size: 46px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 4px var(--accent);
+  will-change: transform;
+}
+.kit-cursor.fist { box-shadow: 0 0 0 5px var(--gold); }
+
+/* small mirrored camera picture while playing (createShell({ preview: true })) */
+.kit-preview {
+  position: fixed;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: clamp(110px, 16vw, 180px);
+  aspect-ratio: 4 / 3;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #222;
+  border: 4px solid #fff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  z-index: 15;
+  pointer-events: none;
+}
+.kit-preview video, .kit-preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.kit-badge { position: absolute; left: 6px; top: 6px; padding: 0 8px; border-radius: 999px; background: var(--error); color: #fff; font-size: 14px; }
+.kit-badge.ok { background: var(--go); }
+
+/* loading overlay */
+.kit-loading { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; background: var(--loading-bg); z-index: 40; font-size: 20px; }
+.spinner { width: 64px; height: 64px; border-radius: 50%; border: 8px solid var(--spinner-track); border-top-color: var(--accent); animation: kit-spin 0.9s linear infinite; }
+
+/* confetti and emoji bursts (fx.js) */
+.kit-fx { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 30; }
+.kit-confetti { position: absolute; top: -20px; width: 12px; height: 18px; border-radius: 3px; animation: kit-fall var(--t, 2.4s) linear forwards; }
+.kit-particle { position: absolute; font-size: 34px; translate: -50% -50%; animation: kit-burst var(--t, 1s) ease-out forwards; }
+
+@keyframes kit-spin { to { transform: rotate(360deg); } }
+@keyframes kit-bob { 50% { transform: translateY(-10px) rotate(-6deg); } }
+@keyframes kit-pulse { 50% { transform: scale(1.07); } }
+@keyframes kit-pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes kit-fall { to { transform: translate(var(--dx), 105vh) rotate(var(--rot)); } }
+@keyframes kit-burst { 0% { transform: translate(0, 0) scale(0.4); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  #start .logo, .pill.go, .tool.go { animation: none; }
+}

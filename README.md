@@ -13,8 +13,18 @@ tracking that runs entirely in the browser. The root `index.html` is a menu that
 
 ## Adding a game
 
-Create a new folder with its own `index.html` (keep paths relative so it works under `/mediapipetest/<folder>/`),
-then add a card for it in the root `index.html` and a row in the table above.
+Copy [`template/`](template/) (a small working game, *Star Catcher*) to a new folder and follow
+[`docs/NEW_GAME.md`](docs/NEW_GAME.md). The shared code in [`common/`](common/) already does the boring parts:
+
+| File | What it gives you |
+| --- | --- |
+| `common/kit.css` | The look: start screen, big buttons, camera picker, Grown-ups box, tool buttons, hand-dwell rings, loading overlay, camera preview, confetti. Re-skin with CSS variables. |
+| `common/shell.js` | `createShell()`: start screen ⇄ game, camera picker (PC or phone over Wi‑Fi), loading, waiting for the phone, error messages, loading MediaPipe. |
+| `common/tracking.js` | `HandTracker` / `PoseTracker`: MediaPipe models, One Euro smoothing, stable hand ids, cursors, fist detection; helpers to draw the mirrored camera on a canvas. |
+| `common/fx.js` | Sound on/off, beeps, a talking voice (any language), confetti, emoji bursts, buttons pressed by holding a hand over them, hand pointers, the frame loop, saved settings. |
+
+Copy My Hands, Little Chef and Ərəbcə Rəqəmlər use it; the `arcade/` and `ride/` games predate it and still have their own copies.
+Add a card for the new game in the root `index.html` and a row in the table above.
 
 ## Play on GitHub Pages
 
@@ -57,5 +67,5 @@ Two switches under **Settings** on the start screen (both on by default, remembe
 To use a phone as the camera, use the **Camera** picker on the start screen, pick *Phone (Wi‑Fi)* and scan the QR code
 (it uses the arcade's phone page, `arcade/phone.html`); the game starts as soon as the phone connects.
 
-Files: `cooking/index.html`, `cooking/style.css`, `cooking/js/main.js` (game), `cooking/js/hands.js`
-(webcam + MediaPipe Hand Landmarker → hand cursors).
+Files: `cooking/index.html`, `cooking/style.css`, `cooking/js/main.js` (game). Hand tracking and the
+start screen / camera flow come from `common/` (see below).

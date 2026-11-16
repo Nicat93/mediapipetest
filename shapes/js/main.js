@@ -1,6 +1,9 @@
 // Copy My Hands: a hand shape appears as a ghost, the child makes the same
 // shape with their hand(s). The closer the match, the more stars.
 import { POSES, makeLevel, poseHand, features, compare } from './poses.js';
+import { HandTracker, coverFit, toScreen, toCamera, drawVideo } from '../../common/tracking.js';
+import { createShell } from '../../common/shell.js';
+import { store, createSound, createSpeech, confetti, HandButtons, loop } from '../../common/fx.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -27,9 +30,6 @@ const ui = {
   win: $('win'),
   winStars: $('win-stars'),
   winText: $('win-text'),
-  loading: $('loading'),
-  loadingText: $('loading-text'),
-  startMsg: $('start-msg'),
   play: $('play'),
   restart: $('restart'),
 };
@@ -38,22 +38,8 @@ const layer = document.createElement('canvas');
 const lg = layer.getContext('2d');
 
 // ------------------------------------------------------------------ storage
-const store = {
-  get(key, fallback) {
-    try {
-      const v = localStorage.getItem(key);
-      return v === null ? fallback : JSON.parse(v);
-    } catch {
-      return fallback;
-    }
-  },
-  set(key, v) {
-    try { localStorage.setItem(key, JSON.stringify(v)); } catch {}
-  },
-};
 let savedLevel = store.get(LEVEL_KEY, 1);
 const stars = store.get(STARS_KEY, {});
-let soundOn = store.get(SOUND_KEY, true);
 
 function showStartButtons() {
   ui.play.querySelector('small').textContent = `Level ${savedLevel}`;
@@ -62,62 +48,11 @@ function showStartButtons() {
 showStartButtons();
 
 // -------------------------------------------------------------------- sound
-let actx = null;
-function audio() {
-  if (!actx) {
-    try { actx = new AudioContext(); } catch {}
-  }
-  actx?.resume?.();
-}
-function tone(freq, time = 0.12, delay = 0, type = 'sine', vol = 0.18) {
-  if (!soundOn || !actx) return;
-  const t = actx.currentTime + delay;
-  const o = actx.createOscillator();
-  const v = actx.createGain();
-  o.type = type;
-  o.frequency.setValueAtTime(freq, t);
-  v.gain.setValueAtTime(0.0001, t);
-  v.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-  v.gain.exponentialRampToValueAtTime(0.0001, t + time);
-  o.connect(v).connect(actx.destination);
-  o.start(t);
-  o.stop(t + time + 0.02);
-}
-const sfx = {
-  press: () => tone(660, 0.1),
-  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, i * 0.11, 'triangle')),
-  star: (i) => tone(880 + i * 220, 0.18, 0, 'triangle', 0.14),
-};
-let voice = null;
-function pickVoice() {
-  const list = window.speechSynthesis?.getVoices() || [];
-  voice = list.find((v) => /^en[-_]/i.test(v.lang) && /female|samantha|zira|aria|jenny|google us/i.test(v.name))
-    || list.find((v) => /^en[-_]/i.test(v.lang)) || null;
-}
-window.speechSynthesis?.addEventListener?.('voiceschanged', pickVoice);
-pickVoice();
-function speak(text) {
-  const synth = window.speechSynthesis;
-  if (!soundOn || !synth) return;
-  synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  if (voice) u.voice = voice;
-  u.lang = voice?.lang || 'en-US';
-  u.rate = 0.95;
-  u.pitch = 1.15;
-  synth.speak(u);
-}
-
-function updateSoundButton() {
-  $('btn-sound').textContent = soundOn ? '🔊' : '🔇';
-}
-updateSoundButton();
-$('btn-sound').addEventListener('click', () => {
-  soundOn = !soundOn;
-  store.set(SOUND_KEY, soundOn);
-  if (!soundOn) window.speechSynthesis?.cancel();
-  updateSoundButton();
-});
+const sound = createSound({ key: SOUND_KEY });
+const sfx = sound.sfx;
+const speech = createSpeech(sound, { lang: 'en', rate: 0.95, pitch: 1.15 });
+const speak = (text) => speech.say(text);
+sound.bindButton($('btn-sound'));
 
 // ------------------------------------------------------------------- layout
 let W = 0;
@@ -140,15 +75,8 @@ window.addEventListener('resize', resize);
 
 /** Where the (mirrored, cropped) camera picture sits on the screen. */
 function view() {
-  const v = $('cam-video');
-  const vw = v.videoWidth || 640;
-  const vh = v.videoHeight || 480;
-  const s = Math.max(W / vw, H / vh) * ZOOM;
-  const dw = vw * s;
-  const dh = vh * s;
-  return { ox: (W - dw) / 2, oy: (H - dh) / 2, dw, dh };
+  return coverFit($('cam-video'), W, H, ZOOM);
 }
-const toScreen = (p, t) => ({ x: t.ox + (1 - p.x) * t.dw, y: t.oy + p.y * t.dh });
 
 // -------------------------------------------------------------------- level
 let level = null;
@@ -233,7 +161,7 @@ function win() {
   ui.win.classList.remove('hidden');
   sfx.win();
   speak(word);
-  confetti();
+  confetti(70, ['#7b5cff', '#ff8a3d', '#37c871', '#ffc23d', '#ff5d8f', '#3ab7ff']);
   nextTimer = setTimeout(() => startLevel(level.n + 1), 2800);
 }
 
@@ -327,13 +255,7 @@ function drawBackground(t) {
   const v = $('cam-video');
   g.fillStyle = '#e8ecff';
   g.fillRect(0, 0, W, H);
-  if (v.readyState >= 2) {
-    g.save();
-    g.globalAlpha = 0.6;
-    g.translate(t.ox + t.dw, t.oy);
-    g.scale(-1, 1);
-    g.drawImage(v, 0, 0, t.dw, t.dh);
-    g.restore();
+  if (drawVideo(g, v, t, 0.6)) {
     g.fillStyle = 'rgba(235, 240, 255, 0.35)';
     g.fillRect(0, 0, W, H);
   }
@@ -372,65 +294,22 @@ function scoreHands(hands) {
 }
 
 // ------------------------------------------------------------- hand buttons
-const buttons = () => [...document.querySelectorAll('#game .hb')].filter((b) => b.offsetParent !== null);
-const dwell = new Map(); // button -> seconds
-const blocked = new Set();
-
-function updateButtons(points, dt) {
-  const hot = new Set();
-  for (const b of buttons()) {
-    const r = b.getBoundingClientRect();
-    const over = points.some((p) => p.x > r.left - 12 && p.x < r.right + 12 && p.y > r.top - 12 && p.y < r.bottom + 12);
-    if (!over) {
-      blocked.delete(b);
-      continue;
-    }
-    if (blocked.has(b)) continue;
-    hot.add(b);
-    const t = (dwell.get(b) || 0) + dt;
-    dwell.set(b, t);
-    if (t >= BUTTON_TIME) {
-      dwell.delete(b);
-      blocked.add(b);
-      b.click();
-    }
-  }
-  for (const b of buttons()) {
-    if (!hot.has(b)) dwell.delete(b);
-    const p = (dwell.get(b) || 0) / BUTTON_TIME;
-    b.style.setProperty('--p', p.toFixed(3));
-    b.classList.toggle('hot', p > 0);
-  }
-}
+const buttons = new HandButtons({ root: ui.game, time: BUTTON_TIME, fistPress: false }); // a fist is a shape here
 
 // --------------------------------------------------------------------- loop
-let tracker = null;
-let camera = null;
-let waitingForPhone = false;
-let last = performance.now();
-
-function frame(now) {
-  requestAnimationFrame(frame);
-  const dt = clamp((now - last) / 1000, 0, 0.1);
-  last = now;
-  if (phase === 'off' || !tracker) return;
-  try {
-    tick(dt, now);
-  } catch (err) {
-    console.error(err);
-  }
-}
+loop((dt, now) => {
+  if (phase !== 'off' && shell.mode === 'camera') tick(dt, now);
+});
 
 function tick(dt, now) {
   const t = view();
   drawBackground(t);
   drawGhosts(now);
-  const tracked = tracker.update(now);
-  const hands = tracked.map((h) => {
+  const hands = shell.track(now).map((h) => {
     const pts = h.lm.map((p) => toScreen(p, t));
-    return { pts, size: Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y) };
+    return { id: h.id, pts, size: Math.hypot(pts[0].x - pts[9].x, pts[0].y - pts[9].y) };
   });
-  updateButtons(hands.map((h) => features(h.pts)), dt);
+  buttons.update(hands.map((h) => ({ id: h.id, ...features(h.pts) })), dt);
 
   const res = scoreHands(hands);
   const k = 1 - Math.exp(-dt / 0.2);
@@ -488,30 +367,11 @@ function tick(dt, now) {
     }
   }
 }
-requestAnimationFrame(frame);
-
-// ------------------------------------------------------------------ confetti
-function confetti() {
-  const fx = $('fx');
-  const colors = ['#7b5cff', '#ff8a3d', '#37c871', '#ffc23d', '#ff5d8f', '#3ab7ff'];
-  for (let i = 0; i < 70; i++) {
-    const p = document.createElement('i');
-    p.className = 'bit';
-    p.style.left = `${Math.random() * 100}%`;
-    p.style.background = colors[i % colors.length];
-    p.style.setProperty('--dx', `${(Math.random() - 0.5) * 200}px`);
-    p.style.setProperty('--r', `${Math.random() * 720 - 360}deg`);
-    p.style.animationDelay = `${Math.random() * 0.4}s`;
-    p.style.animationDuration = `${1.6 + Math.random() * 1.2}s`;
-    fx.append(p);
-    setTimeout(() => p.remove(), 3400);
-  }
-}
 
 // --------------------------------------------------------------- game flow
 $('btn-home').addEventListener('click', () => {
   sfx.press();
-  toStart();
+  shell.home();
 });
 $('btn-skip').addEventListener('click', () => {
   sfx.press();
@@ -522,67 +382,23 @@ $('btn-again').addEventListener('click', () => {
   if (level) sayLevel();
 });
 
-function toStart(message = '') {
-  clearTimeout(nextTimer);
-  phase = 'off';
-  window.speechSynthesis?.cancel();
-  waitingForPhone = false;
-  tracker?.stop(camera);
-  ui.game.classList.add('hidden');
-  ui.start.classList.remove('hidden');
-  ui.startMsg.textContent = message;
-  showStartButtons();
-}
-
-import('../../arcade/js/camera.js')
-  .then(({ createCamera }) => {
-    camera = createCamera({
-      video: $('cam-video'),
-      select: $('camera'),
-      linkEl: $('link'),
-      isActive: () => phase !== 'off',
-      onPhoneReady: () => { if (waitingForPhone) begin(savedLevel); },
-      onError: (text) => (ui.startMsg.textContent = text),
-    });
-  })
-  .catch((err) => console.warn('Camera picker unavailable', err));
-
-async function begin(n) {
-  audio();
-  waitingForPhone = false;
-  ui.startMsg.textContent = '';
-  ui.loading.classList.remove('hidden');
-  try {
-    if (!camera) throw new Error('The camera code did not load. Check the internet connection and reload.');
-    if (!tracker) {
-      ui.loadingText.textContent = 'Loading…';
-      const { HandTracker } = await import('./tracker.js');
-      tracker = new HandTracker($('cam-video'));
-    }
-    const ready = await tracker.start(camera, (msg) => (ui.loadingText.textContent = msg));
-    ui.loading.classList.add('hidden');
-    if (!ready) {
-      waitingForPhone = true;
-      ui.startMsg.textContent = 'Waiting for the phone… Scan the QR code with it.';
-      $('link').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    ui.start.classList.add('hidden');
-    ui.game.classList.remove('hidden');
+const shell = createShell({
+  lang: 'en',
+  unlock: () => sound.unlock(),
+  tracker: (video) => new HandTracker(video, { numHands: 2 }),
+  onPlay: ({ arg }) => {
     resize();
-    startLevel(n);
-  } catch (err) {
-    console.error(err);
-    tracker?.stop(camera);
-    ui.loading.classList.add('hidden');
-    let msg = err?.message || String(err);
-    if (err?.name === 'NotAllowedError') msg = 'Camera permission was refused.';
-    if (err?.name === 'NotFoundError') msg = 'No camera found.';
-    toStart(`Couldn’t open the camera: ${msg}`);
-  }
-}
-ui.play.addEventListener('click', () => begin(savedLevel));
-ui.restart.addEventListener('click', () => begin(1));
+    startLevel(arg);
+  },
+  onHome: () => {
+    clearTimeout(nextTimer);
+    phase = 'off';
+    buttons.reset();
+    showStartButtons();
+  },
+});
+ui.play.addEventListener('click', () => shell.play(savedLevel));
+ui.restart.addEventListener('click', () => shell.play(1));
 resize();
 
 // For automated tests: the current targets as camera landmarks.
@@ -592,11 +408,11 @@ if (new URLSearchParams(location.search).has('test')) {
     // a pose drawn at (x, y) in screen px, as camera landmarks
     poseCam: (pose, o) => {
       const t = view();
-      return poseHand(pose, { size: handSize(), ...o }).map((p) => ({ x: 1 - (p.x - t.ox) / t.dw, y: (p.y - t.oy) / t.dh, z: 0 }));
+      return poseHand(pose, { size: handSize(), ...o }).map((p) => ({ ...toCamera(p, t), z: 0 }));
     },
     targetsCam: () => {
       const t = view();
-      return targets.map((tg) => tg.pts.map((p) => ({ x: 1 - (p.x - t.ox) / t.dw, y: (p.y - t.oy) / t.dh, z: 0 })));
+      return targets.map((tg) => tg.pts.map((p) => ({ ...toCamera(p, t), z: 0 })));
     },
   };
 }

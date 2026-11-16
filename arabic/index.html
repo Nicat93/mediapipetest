@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Noto+Naskh+Arabic:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../common/kit.css">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="js/main.js"></script>
 </head>
@@ -21,14 +22,7 @@
       <button id="play-hands" class="big"><span class="ico" aria-hidden="true">✊</span>Əllə oyna<small>kamera ilə</small></button>
       <button id="play-touch" class="big alt"><span class="ico" aria-hidden="true">👆</span>Toxunaraq oyna<small>barmaq və ya siçan</small></button>
     </div>
-    <label class="cam-pick">Kamera
-      <select id="camera"><option value="">PC camera</option><option value="phone">Phone (Wi‑Fi)</option></select>
-    </label>
-    <div id="link" hidden>
-      <span class="state"></span>
-      <span class="url"></span>
-    </div>
-    <p class="msg" id="start-msg" role="status"></p>
+    <div class="kit-camera"></div>
     <details class="grown-ups">
       <summary>Böyüklər üçün</summary>
       <p>
@@ -92,14 +86,6 @@
     </main>
   </section>
 
-  <div id="cam" class="hidden">
-    <video id="cam-video" playsinline muted></video>
-    <canvas id="cam-canvas"></canvas>
-    <div id="cam-badge">✋?</div>
-  </div>
-
-  <div id="loading" class="hidden" role="status"><div class="spinner"></div><p id="loading-text">Hazırlanır…</p></div>
-  <div id="fx" aria-hidden="true"></div>
   <div id="cursors" aria-hidden="true"></div>
 </body>
 </html>

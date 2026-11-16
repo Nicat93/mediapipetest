@@ -3,15 +3,17 @@
 // "How many?" quiz. Works with touch / mouse, or hands on a camera: hover or
 // make a fist to press, make a fist to write (open hand = pen up).
 import { NUMBERS, PRAISE } from './numbers.js';
+import { HandTracker } from '../../common/tracking.js';
+import { createShell } from '../../common/shell.js';
+import { createSound, createSpeech, confetti, burst } from '../../common/fx.js';
 
 const $ = (id) => document.getElementById(id);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 const ui = {
-  start: $('start'), game: $('game'), title: $('title'), startMsg: $('start-msg'),
-  loading: $('loading'), loadingText: $('loading-text'), cam: $('cam'), camBadge: $('cam-badge'),
-  fx: $('fx'), cursors: $('cursors'), sound: $('btn-sound'),
+  start: $('start'), game: $('game'), title: $('title'),
+  cursors: $('cursors'), sound: $('btn-sound'),
   views: { map: $('map'), learn: $('learn'), write: $('write'), quiz: $('quiz') },
   nums: $('nums'), objects: $('objects'), quizObjects: $('quiz-objects'), choices: $('choices'),
   btnWrite: $('btn-write'), btnNext: $('btn-next'),
@@ -40,31 +42,9 @@ optVoice.addEventListener('change', () => {
 });
 
 // -------------------------------------------------------------------- sound
-let muted = false;
-let actx = null;
-function audio() {
-  try {
-    actx ||= new (window.AudioContext || window.webkitAudioContext)();
-    if (actx.state === 'suspended') actx.resume();
-  } catch {}
-  return actx;
-}
-function tone(freq, dur, { type = 'sine', vol = 0.2, at = 0, slide = 0 } = {}) {
-  const c = audio();
-  if (!c || muted) return;
-  const t = c.currentTime + at;
-  const o = c.createOscillator();
-  const g = c.createGain();
-  o.type = type;
-  o.frequency.setValueAtTime(freq, t);
-  if (slide) o.frequency.exponentialRampToValueAtTime(freq + slide, t + dur);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(c.destination);
-  o.start(t);
-  o.stop(t + dur + 0.02);
-}
+const sound = createSound();
+const tone = sound.tone;
+sound.bindButton(ui.sound);
 const sfx = {
   pop() { tone(660, 0.12, { type: 'triangle', vol: 0.2, slide: 300 }); },
   press() { tone(520, 0.08, { type: 'triangle', vol: 0.15 }); },
@@ -74,83 +54,27 @@ const sfx = {
 
 // Voices: Arabic for the numbers, Azerbaijani (or Turkish, which reads it
 // well enough) for the short instructions.
-const voices = { ar: null, az: null };
-function loadVoices() {
-  const all = window.speechSynthesis?.getVoices() || [];
-  const best = (re) => {
-    const vs = all.filter((v) => re.test(v.lang));
-    return vs.find((v) => /natural|google|online/i.test(v.name)) || vs[0] || null;
-  };
-  voices.ar = best(/^ar\b|^ar-/i);
-  voices.az = best(/^az\b|^az-/i) || best(/^tr\b|^tr-/i);
+const AZ = 'az|tr';
+const speech = createSpeech(sound, { lang: AZ, rate: 0.95, pitch: 1.15 });
+speech.onVoices(() => {
+  const ar = speech.voice('ar');
+  const az = speech.voice(AZ);
   $('voice-info').textContent =
-    `Ərəb səsi: ${voices.ar ? voices.ar.name : 'yoxdur — sözlər oxunuşla (məs. “səlasə”) deyiləcək'}. ` +
-    `Azərbaycan/türk səsi: ${voices.az ? voices.az.name : 'yoxdur'}.`;
-}
-loadVoices();
-window.speechSynthesis?.addEventListener?.('voiceschanged', loadVoices);
+    `Ərəb səsi: ${ar ? ar.name : 'yoxdur — sözlər oxunuşla (məs. “səlasə”) deyiləcək'}. ` +
+    `Azərbaycan/türk səsi: ${az ? az.name : 'yoxdur'}.`;
+});
 
-/** Speaks a list of [text, 'ar' | 'az'] parts in order (cancels what was playing). */
+/** Speaks a list of [text, 'ar' | 'az', transliteration?] parts in order (cancels what was playing). */
 function speak(parts) {
-  const synth = window.speechSynthesis;
-  if (muted || !synth) return;
-  synth.cancel();
-  for (const [text, lang, tr] of parts) {
-    let v = null;
-    let t = text;
-    if (lang === 'ar') {
-      v = voices.ar;
-      if (!v) { t = tr || text; v = voices.az; } // no Arabic voice: say the transliteration
-    } else {
-      if (!optVoice.checked || !voices.az) continue;
-      v = voices.az;
-    }
-    const u = new SpeechSynthesisUtterance(t);
-    if (v) { u.voice = v; u.lang = v.lang; }
-    u.rate = lang === 'ar' ? 0.8 : 0.95;
-    u.pitch = 1.15;
-    synth.speak(u);
-  }
+  const sayAz = optVoice.checked && speech.voice(AZ);
+  speech.say(parts
+    .filter(([, lang]) => lang === 'ar' || sayAz)
+    .map(([text, lang, tr]) => (lang === 'ar'
+      ? { text, lang: 'ar', rate: 0.8, fallback: { text: tr || text, lang: AZ } } // no Arabic voice: say the transliteration
+      : { text, lang: AZ })));
 }
 const arPart = (num) => [num.say, 'ar', num.tr];
 
-ui.sound.addEventListener('click', () => {
-  muted = !muted;
-  ui.sound.textContent = muted ? '🔇' : '🔊';
-  if (muted) window.speechSynthesis?.cancel();
-});
-
-// ---------------------------------------------------------------- effects
-function burst(x, y, emojis, n) {
-  for (let i = 0; i < n; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    p.textContent = pick(emojis);
-    p.style.left = `${x}px`;
-    p.style.top = `${y}px`;
-    const a = Math.random() * Math.PI * 2;
-    const dist = 70 + Math.random() * 110;
-    p.style.setProperty('--dx', `${Math.cos(a) * dist}px`);
-    p.style.setProperty('--dy', `${Math.sin(a) * dist}px`);
-    ui.fx.appendChild(p);
-    setTimeout(() => p.remove(), 1400);
-  }
-}
-function confetti(n = 70) {
-  const colors = ['#7b5cff', '#ffb703', '#2fb36d', '#ff5d8f', '#3fa9f5', '#ff8a3d'];
-  for (let i = 0; i < n; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.left = `${Math.random() * 100}vw`;
-    c.style.background = pick(colors);
-    c.style.setProperty('--dx', `${(Math.random() - 0.5) * 200}px`);
-    c.style.setProperty('--rot', `${Math.random() * 720}deg`);
-    c.style.setProperty('--t', `${1.8 + Math.random() * 1.4}s`);
-    c.style.animationDelay = `${Math.random() * 0.4}s`;
-    ui.fx.appendChild(c);
-    setTimeout(() => c.remove(), 3800);
-  }
-}
 const centerOf = (el) => {
   const r = el.getBoundingClientRect();
   return [(r.left + r.right) / 2, (r.top + r.bottom) / 2];
@@ -585,9 +509,9 @@ $('btn-home').addEventListener('click', () => {
 });
 
 // ------------------------------------------------------------ hand cursors
-let tracker = null;
-let camera = null;
-let waitingForPhone = false;
+// Only the middle part of the camera image maps to the whole screen, so small
+// arms reach every corner without leaning out of view.
+const REGION = { x0: 0.15, x1: 0.85, y0: 0.1, y1: 0.75 };
 let noHandT = 0;
 const agents = new Map();
 
@@ -637,7 +561,7 @@ function hitAt(list, x, y, pad = 10) {
 }
 
 function updateHands(dt, now) {
-  const cursors = tracker.update(now);
+  const cursors = shell.track(now);
   const seen = new Set();
   countCool -= dt;
   const buttons = pressables();
@@ -701,8 +625,6 @@ function updateHands(dt, now) {
   for (const a of [...agents.values()]) if (!seen.has(a.id)) dropAgent(a);
 
   const ok = cursors.length > 0;
-  ui.camBadge.textContent = ok ? '✋ ✓' : '✋ ?';
-  ui.camBadge.classList.toggle('ok', ok);
   noHandT = ok ? 0 : noHandT + dt;
   if (noHandT > 8) {
     noHandT = -12;
@@ -713,73 +635,26 @@ function updateHands(dt, now) {
 // ------------------------------------------------------------- game flow
 function startGame(withHands) {
   mode = withHands ? 'hands' : 'touch';
-  ui.start.classList.add('hidden');
-  ui.game.classList.remove('hidden');
-  ui.cam.classList.toggle('hidden', !withHands);
   showMap();
 }
+const toStart = (message = '') => shell.home(message);
 
-function toStart(message = '') {
-  clearTimers();
-  window.speechSynthesis?.cancel();
-  for (const a of [...agents.values()]) dropAgent(a);
-  waitingForPhone = false;
-  tracker?.stop(camera);
-  mode = 'touch';
-  ui.cam.classList.add('hidden');
-  ui.game.classList.add('hidden');
-  ui.start.classList.remove('hidden');
-  ui.startMsg.textContent = message;
-}
-
-import('../../arcade/js/camera.js')
-  .then(({ createCamera }) => {
-    camera = createCamera({
-      video: $('cam-video'),
-      select: $('camera'),
-      linkEl: $('link'),
-      isActive: () => mode === 'hands',
-      onPhoneReady: () => { if (waitingForPhone) $('play-hands').click(); },
-      onError: (text) => (ui.startMsg.textContent = text),
-    });
-  })
-  .catch((err) => console.warn('Camera picker unavailable', err));
-
-$('play-touch').addEventListener('click', () => {
-  audio();
-  startGame(false);
+// Start screen, camera picker (PC or phone), loading and errors: ../../common/shell.js
+const shell = createShell({
+  lang: 'az',
+  touch: true,
+  preview: true,
+  unlock: () => sound.unlock(),
+  tracker: (video, preview) => new HandTracker(video, { region: REGION, lostMs: 400, smoothLandmarks: false, preview }),
+  onPlay: ({ camera }) => startGame(camera),
+  onHome: () => {
+    clearTimers();
+    for (const a of [...agents.values()]) dropAgent(a);
+    mode = 'touch';
+  },
 });
-$('play-hands').addEventListener('click', async () => {
-  audio();
-  waitingForPhone = false;
-  ui.startMsg.textContent = '';
-  ui.loading.classList.remove('hidden');
-  try {
-    if (!camera) throw new Error('Kamera kodu yüklənmədi. İnterneti yoxlayıb səhifəni yeniləyin.');
-    if (!tracker) {
-      ui.loadingText.textContent = 'Yüklənir…';
-      const { HandTracker } = await import('./hands.js');
-      tracker = new HandTracker($('cam-video'), $('cam-canvas'));
-    }
-    const ready = await tracker.start(camera, (msg) => (ui.loadingText.textContent = msg));
-    ui.loading.classList.add('hidden');
-    if (!ready) {
-      waitingForPhone = true;
-      ui.startMsg.textContent = 'Telefon gözlənilir… QR kodu telefonla skan edin.';
-      $('link').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    startGame(true);
-  } catch (err) {
-    console.error(err);
-    tracker?.stop(camera);
-    ui.loading.classList.add('hidden');
-    let msg = err?.message || String(err);
-    if (err?.name === 'NotAllowedError') msg = 'Kameraya icazə verilmədi.';
-    if (err?.name === 'NotFoundError') msg = 'Kamera tapılmadı.';
-    toStart(`Kamera açılmadı: ${msg} Toxunaraq da oynamaq olar.`);
-  }
-});
+$('play-touch').addEventListener('click', () => shell.playTouch());
+$('play-hands').addEventListener('click', () => shell.play());
 
 // -------------------------------------------------------------------- loop
 let last = performance.now();
@@ -788,7 +663,7 @@ function loop(now) {
   const dt = clamp((now - last) / 1000, 0, 0.1);
   last = now;
   if (mode !== 'hands') { countCool -= dt; return; }
-  if (!tracker || ui.game.classList.contains('hidden')) return;
+  if (shell.mode !== 'camera') return;
   try {
     updateHands(dt, now);
   } catch (err) {

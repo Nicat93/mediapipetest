@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Star Catcher</title>
+  <meta name="description" content="Starter game: catch stars with your hands. Copy this folder to start a new game.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../common/kit.css">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <!-- start screen: look and camera flow come from ../common (see docs/NEW_GAME.md) -->
+  <section id="start" class="screen">
+    <div class="logo" aria-hidden="true">⭐</div>
+    <h1>Star Catcher</h1>
+    <p class="tag">Touch the stars with your hands!</p>
+    <div class="start-buttons">
+      <button id="play" class="big"><span class="ico" aria-hidden="true">✋</span>Play with hands<small>uses the camera</small></button>
+      <button id="play-touch" class="big alt"><span class="ico" aria-hidden="true">👆</span>Play with touch<small>or a mouse</small></button>
+    </div>
+    <div class="kit-camera"></div>
+    <details class="grown-ups">
+      <summary>Grown-ups</summary>
+      <p>The starter game for new ideas: stars appear, your child touches them. The video stays on this device.</p>
+      <p><a href="../">All games</a></p>
+    </details>
+  </section>
+
+  <!-- game screen -->
+  <section id="game" class="screen hidden">
+    <header>
+      <button id="btn-home" class="tool hb" aria-label="Home">🏠</button>
+      <div id="score" aria-live="polite">0</div>
+      <button id="btn-sound" class="tool" aria-label="Sound on or off">🔊</button>
+    </header>
+    <div id="field"></div>
+  </section>
+</body>
+</html>

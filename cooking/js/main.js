@@ -2,6 +2,9 @@
 // Put the right food in the dish (drag, tap, or hold a hand over it in front of
 // the webcam), then wave/rub over the dish to cook it.
 
+import { HandTracker } from '../../common/tracking.js';
+import { createShell } from '../../common/shell.js';
+import { createSound, createSpeech, confetti, burst } from '../../common/fx.js';
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
@@ -83,14 +86,8 @@ const ui = {
   sound: $('btn-sound'),
   fx: $('fx'),
   cursors: $('cursors'),
-  cam: $('cam'),
-  camBadge: $('cam-badge'),
-  loading: $('loading'),
-  loadingText: $('loading-text'),
-  startMsg: $('start-msg'),
 };
 
-let tracker = null; // HandTracker, created when "Play with hands" is chosen
 let mode = 'touch'; // 'touch' | 'hands'
 let phase = 'start'; // start | add | cook | done
 let recipeIndex = 0;
@@ -101,39 +98,12 @@ let cookProgress = 0;
 let idleT = 0;
 let noHandT = 0;
 let particleT = 0;
-let muted = false;
 let last = performance.now();
 
 // ------------------------------------------------------------------ sound
-let actx = null;
-function audio() {
-  if (!actx) {
-    try {
-      actx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch {
-      return null;
-    }
-  }
-  if (actx.state === 'suspended') actx.resume();
-  return actx;
-}
-function tone(freq, dur, { type = 'sine', vol = 0.15, slide = 0, delay = 0 } = {}) {
-  if (muted) return;
-  const ctx = audio();
-  if (!ctx) return;
-  const t = ctx.currentTime + delay;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t);
-  if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(t);
-  osc.stop(t + dur + 0.05);
-}
+const sound = createSound();
+const tone = (freq, dur, { delay = 0, ...o } = {}) => sound.tone(freq, dur, { vol: 0.15, ...o, at: delay });
+sound.bindButton(ui.sound);
 const sfx = {
   pick: () => tone(520, 0.12, { type: 'triangle', slide: 300 }),
   plop: () => {
@@ -150,36 +120,8 @@ const sfx = {
     [523, 659, 784, 1047].forEach((f, i) => tone(f, i === 3 ? 0.5 : 0.16, { type: 'triangle', vol: 0.16, delay: i * 0.13 })),
 };
 
-let voice = null;
-function chooseVoice() {
-  const voices = window.speechSynthesis?.getVoices() || [];
-  const en = voices.filter((v) => /^en/i.test(v.lang));
-  voice =
-    en.find((v) => /female|samantha|zira|aria|jenny|google us english|karen|moira/i.test(v.name)) ||
-    en.find((v) => /en-US/i.test(v.lang)) ||
-    en[0] ||
-    null;
-}
-window.speechSynthesis?.addEventListener?.('voiceschanged', chooseVoice);
-chooseVoice();
-
-function say(text) {
-  const synth = window.speechSynthesis;
-  if (muted || !synth) return;
-  synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  if (voice) u.voice = voice;
-  u.lang = voice?.lang || 'en-US';
-  u.rate = 0.9;
-  u.pitch = 1.25;
-  synth.speak(u);
-}
-
-ui.sound.addEventListener('click', () => {
-  muted = !muted;
-  ui.sound.textContent = muted ? '🔇' : '🔊';
-  if (muted) window.speechSynthesis?.cancel();
-});
+const speech = createSpeech(sound, { lang: 'en', rate: 0.9, pitch: 1.25 });
+const say = (text) => speech.say(text);
 
 // ----------------------------------------------------------------- colours
 function mix(a, b, t) {
@@ -342,7 +284,7 @@ function addCookWork(amount) {
     particleT = 0.12;
     const d = dishGeom();
     const steamy = ['pot', 'pan'].includes(recipe.dish);
-    burst(d.x + (Math.random() - 0.5) * d.r, d.y + (Math.random() - 0.5) * d.r, steamy ? ['💨', '✨'] : ['✨', '⭐'], 1, true);
+    burst(d.x + (Math.random() - 0.5) * d.r, d.y + (Math.random() - 0.5) * d.r, steamy ? ['💨', '✨'] : ['✨', '⭐'], 1, { gentle: true });
     sfx.sizzle();
   }
   if (cookProgress >= 1) finishCooking();
@@ -355,7 +297,7 @@ function finishCooking() {
   ui.dish.style.opacity = '0.3';
   ui.doneDish.classList.add('show');
   sfx.fanfare();
-  confetti();
+  confetti(70, ['#ff6b8b', '#ffb703', '#3bb273', '#6c8cff', '#c77dff', '#ff9f1c']);
   const d = dishGeom();
   burst(d.x, d.y, ['⭐', '✨', '💖'], 14);
   const s = document.createElement('span');
@@ -397,38 +339,6 @@ function returnToTile(held) {
     held.tile.classList.remove('lifted');
   });
 }
-function burst(x, y, emojis, n, gentle = false) {
-  for (let i = 0; i < n; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    p.textContent = pick(emojis);
-    p.style.left = `${x}px`;
-    p.style.top = `${y}px`;
-    const a = gentle ? -Math.PI / 2 + (Math.random() - 0.5) : Math.random() * Math.PI * 2;
-    const dist = gentle ? 60 + Math.random() * 60 : 90 + Math.random() * 120;
-    p.style.setProperty('--dx', `${Math.cos(a) * dist}px`);
-    p.style.setProperty('--dy', `${Math.sin(a) * dist}px`);
-    p.style.setProperty('--t', `${gentle ? 1.1 : 0.9 + Math.random() * 0.6}s`);
-    ui.fx.appendChild(p);
-    setTimeout(() => p.remove(), 1600);
-  }
-}
-function confetti() {
-  const colors = ['#ff6b8b', '#ffb703', '#3bb273', '#6c8cff', '#c77dff', '#ff9f1c'];
-  for (let i = 0; i < 70; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.left = `${Math.random() * 100}vw`;
-    c.style.background = pick(colors);
-    c.style.animationDelay = `${Math.random() * 0.6}s`;
-    c.style.setProperty('--t', `${1.8 + Math.random() * 1.4}s`);
-    c.style.setProperty('--dx', `${(Math.random() - 0.5) * 200}px`);
-    c.style.setProperty('--rot', `${Math.random() * 900 - 450}deg`);
-    ui.fx.appendChild(c);
-    setTimeout(() => c.remove(), 3800);
-  }
-}
-
 // ---------------------------------------------------- touch / mouse input
 const pointers = new Map(); // pointerId -> { held, tile, t0, x, y }
 
@@ -436,7 +346,7 @@ ui.shelf.addEventListener('pointerdown', (e) => {
   const tile = e.target.closest('.tile');
   if (!tile || tile.classList.contains('used') || tile.classList.contains('lifted') || phase !== 'add') return;
   e.preventDefault();
-  audio();
+  sound.unlock();
   idleT = 0;
   tile.classList.add('lifted');
   const key = tile.dataset.key;
@@ -520,7 +430,7 @@ function hitButton(x, y) {
 }
 
 function updateHands(dt, now) {
-  const cursors = tracker.update(now);
+  const cursors = shell.track(now);
   const seen = new Set();
   for (const c of cursors) {
     seen.add(c.id);
@@ -609,8 +519,6 @@ function updateHands(dt, now) {
   for (const a of [...hands.values()]) if (!seen.has(a.id)) dropHand(a);
 
   const ok = cursors.length > 0;
-  ui.camBadge.textContent = ok ? '✋ ✓' : '✋ ?';
-  ui.camBadge.classList.toggle('ok', ok);
   noHandT = ok ? 0 : noHandT + dt;
   if (noHandT > 8 && phase !== 'start') {
     noHandT = -12; // don't repeat too often
@@ -623,84 +531,39 @@ function startGame(withHands) {
   mode = withHands ? 'hands' : 'touch';
   ui.start.classList.add('hidden');
   ui.game.classList.remove('hidden');
-  ui.cam.classList.toggle('hidden', !withHands);
   ui.stickers.innerHTML = '';
   recipeIndex = 0;
   loadRecipe();
 }
 
-function toStart(message = '') {
+function cleanUp() {
   phase = 'start';
-  window.speechSynthesis?.cancel();
   for (const a of [...hands.values()]) dropHand(a);
   for (const [id, p] of pointers) {
     p.held.el.remove();
     pointers.delete(id);
   }
   ui.fx.innerHTML = '';
-  waitingForPhone = false;
-  tracker?.stop(camera);
-  ui.cam.classList.add('hidden');
-  ui.game.classList.add('hidden');
-  ui.start.classList.remove('hidden');
-  ui.startMsg.textContent = message;
 }
 
-$('btn-home').addEventListener('click', () => toStart());
-$('play-touch').addEventListener('click', () => {
-  audio();
-  startGame(false);
+// Start screen, camera picker (PC or phone), loading and errors: ../../common/shell.js
+// Only the middle part of the camera image maps to the whole screen, so small
+// arms reach every corner without leaning out of view.
+const REGION = { x0: 0.12, x1: 0.88, y0: 0.08, y1: 0.78 };
+const shell = createShell({
+  lang: 'en',
+  touch: true,
+  preview: true,
+  unlock: () => sound.unlock(),
+  tracker: (video, preview) => new HandTracker(video, { region: REGION, smoothLandmarks: false, preview }),
+  onPlay: ({ camera }) => startGame(camera),
+  onHome: cleanUp,
 });
-// Camera picker (PC camera or phone over Wi-Fi), shared with the arcade games.
-let camera = null;
-let waitingForPhone = false;
-import('../../arcade/js/camera.js')
-  .then(({ createCamera }) => {
-    camera = createCamera({
-      video: $('cam-video'),
-      select: $('camera'),
-      linkEl: $('link'),
-      isActive: () => mode === 'hands' && phase !== 'start',
-      onPhoneReady: () => {
-        if (waitingForPhone) $('play-hands').click();
-      },
-      onError: (text) => (ui.startMsg.textContent = text),
-    });
-  })
-  .catch((err) => console.warn('Camera picker unavailable', err));
-
-$('play-hands').addEventListener('click', async () => {
-  audio();
-  if (!waitingForPhone) say('Hello, little chef!');
-  waitingForPhone = false;
-  ui.startMsg.textContent = '';
-  ui.loading.classList.remove('hidden');
-  try {
-    if (!camera) throw new Error('The camera code did not load. Check the internet connection and reload.');
-    if (!tracker) {
-      ui.loadingText.textContent = 'Loading…';
-      const { HandTracker } = await import('./hands.js');
-      tracker = new HandTracker($('cam-video'), $('cam-canvas'));
-    }
-    const ready = await tracker.start(camera, (msg) => (ui.loadingText.textContent = msg));
-    ui.loading.classList.add('hidden');
-    if (!ready) {
-      // Phone chosen but not connected yet: show the QR code and start once it connects.
-      waitingForPhone = true;
-      ui.startMsg.textContent = 'Waiting for the phone… Scan the QR code below with it.';
-      $('link').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    startGame(true);
-  } catch (err) {
-    console.error(err);
-    tracker?.stop(camera);
-    ui.loading.classList.add('hidden');
-    let msg = err?.message || String(err);
-    if (err?.name === 'NotAllowedError') msg = 'Camera permission was denied.';
-    if (err?.name === 'NotFoundError') msg = 'No camera was found.';
-    toStart(`Couldn't use the camera: ${msg} You can play with touch instead.`);
-  }
+$('btn-home').addEventListener('click', () => shell.home());
+$('play-touch').addEventListener('click', () => shell.playTouch());
+$('play-hands').addEventListener('click', () => {
+  say('Hello, little chef!');
+  shell.play();
 });
 
 // ------------------------------------------------------------------ loop
@@ -712,7 +575,7 @@ function loop(now) {
   particleT -= dt;
   idleT += dt;
 
-  if (mode === 'hands' && tracker) {
+  if (shell.mode === 'camera') {
     try {
       updateHands(dt, now);
     } catch (err) {

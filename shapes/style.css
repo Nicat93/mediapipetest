@@ -1,114 +1,7 @@
-:root {
-  --ink: #2f2a4a;
-  --muted: #6e6890;
-  --bg1: #e3f6ff;
-  --bg2: #fff1d6;
-  --accent: #7b5cff;
-  --accent-dark: #5a3fe0;
-  --go: #2fb36d;
-  --go-dark: #22895a;
-  --gold: #ffb703;
-  --card: #fff;
-}
-
-* { box-sizing: border-box; }
-
-html, body {
-  margin: 0;
-  height: 100%;
-  overflow: hidden;
-  color: var(--ink);
-  font-family: "Baloo 2", system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-weight: 600;
-  background:
-    radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.7) 0 60px, transparent 61px),
-    radial-gradient(circle at 85% 75%, rgba(255, 255, 255, 0.55) 0 90px, transparent 91px),
-    linear-gradient(160deg, var(--bg1), var(--bg2));
-  -webkit-user-select: none;
-  user-select: none;
-  touch-action: none;
-}
-.em, .ico, .tool, #win-stars { font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
-.hidden { display: none !important; }
-
-button {
-  font: inherit;
-  color: inherit;
-  border: 0;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-button:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
-
-/* ---------- start ---------- */
-.screen { position: fixed; inset: 0; }
-#start {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 16px;
-  overflow-y: auto;
-  touch-action: pan-y;
-}
-#start > * { flex-shrink: 0; }
-.logo {
-  font-size: clamp(60px, 13vh, 110px);
-  line-height: 1.1;
-  color: var(--accent);
-  text-shadow: 0 5px 0 #fff;
-  animation: bob 2.4s ease-in-out infinite;
-}
-h1 { font-size: clamp(40px, 9vw, 72px); line-height: 1; color: var(--accent-dark); margin: 4px 0 0; text-shadow: 0 4px 0 #fff; }
-.tag { font-size: 22px; margin: 6px 0 18px; }
-.start-buttons { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
-button.big {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 220px;
-  padding: 16px 26px 14px;
-  border-radius: 28px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 1.15;
-  box-shadow: 0 7px 0 var(--accent-dark), 0 14px 30px rgba(0, 0, 0, 0.12);
-}
-button.big.alt { background: #ff8a3d; box-shadow: 0 7px 0 #d96a1f, 0 14px 30px rgba(0, 0, 0, 0.12); }
-button.big:active { transform: translateY(4px); }
-button.big .ico { font-size: 52px; line-height: 1.15; }
-button.big small { font-size: 15px; font-weight: 600; opacity: 0.92; }
-.cam-pick { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: var(--muted); }
-#camera {
-  font: inherit;
-  font-size: 16px;
-  max-width: min(360px, 80vw);
-  padding: 6px 12px;
-  border-radius: 12px;
-  border: 2px solid var(--accent);
-  background: #fff;
-  color: var(--ink);
-}
-#link { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; max-width: 560px; }
-#link[hidden] { display: none; }
-#link.ok .state { color: var(--go-dark); }
-#link.ok .url { display: none; }
-#link .url { font-size: 17px; padding: 6px 12px; border-radius: 10px; background: #fff; user-select: all; -webkit-user-select: all; }
-#link .qr { width: 168px; max-width: 50vw; background: #fff; border-radius: 10px; padding: 6px; }
-#link .qr:empty, #link .qr[hidden] { display: none; }
-#link .qr svg { display: block; width: 100%; height: auto; }
-.msg { min-height: 1.4em; margin: 10px 0 0; color: #d43d6a; font-size: 18px; }
-details.grown-ups { max-width: 560px; margin-top: 10px; color: var(--muted); font-size: 15px; text-align: left; }
-details.grown-ups summary { cursor: pointer; text-align: center; color: var(--accent-dark); }
-details.grown-ups a { color: var(--accent-dark); }
-.opt { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; color: var(--ink); cursor: pointer; }
-.opt input { width: 22px; height: 22px; accent-color: var(--accent); grid-row: span 2; margin: 2px 0 0; }
-.opt small { grid-column: 2; color: var(--muted); }
-.voice-info { font-size: 13px; }
-
+/* Copy My Hands. Shared look (start screen, buttons, loading, dwell rings)
+   comes from ../common/kit.css; this file only has the game screen. */
+#game .tool { width: 60px; height: 60px; font-size: 28px; }
+#win-stars { font-family: var(--emoji-font); }
 
 /* ---------- game ---------- */
 #stage { position: absolute; inset: 0; display: block; }
@@ -137,34 +30,6 @@ details.grown-ups a { color: var(--accent-dark); }
 .lvl { font-size: 15px; color: var(--muted); line-height: 1.1; }
 #title { font-size: clamp(18px, 3vw, 28px); font-weight: 800; color: var(--accent-dark); line-height: 1.15; }
 .right { display: flex; gap: 8px; }
-.tool {
-  width: 60px;
-  height: 60px;
-  flex: none;
-  border-radius: 20px;
-  background: #fff;
-  font-size: 28px;
-  box-shadow: 0 5px 0 #d8d2f0, 0 8px 16px rgba(0, 0, 0, 0.08);
-  position: relative;
-}
-/* hand dwell progress on buttons */
-.hb { --p: 0; }
-.hb::after {
-  content: "";
-  position: absolute;
-  inset: -7px;
-  border-radius: inherit;
-  pointer-events: none;
-  background: conic-gradient(var(--gold) calc(var(--p) * 1turn), transparent 0);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  padding: 6px;
-  opacity: calc(var(--p) * 10);
-}
-.hb.hot { filter: brightness(1.08); transform: scale(1.06); }
-
 #game footer {
   position: absolute;
   left: 50%;
@@ -219,25 +84,14 @@ details.grown-ups a { color: var(--accent-dark); }
   gap: 6px;
   pointer-events: none;
 }
-#win-stars span { display: inline-block; font-size: clamp(64px, 14vmin, 120px); filter: grayscale(1) opacity(0.35); transform: scale(0); animation: pop 0.45s ease-out forwards; }
+#win-stars span { display: inline-block; font-size: clamp(64px, 14vmin, 120px); filter: grayscale(1) opacity(0.35); transform: scale(0); animation: kit-pop 0.45s ease-out forwards; }
 #win-stars span.on { filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.12)); }
-#win-text { padding: 4px 22px; border-radius: 999px; background: #fff; font-size: clamp(30px, 6vmin, 52px); font-weight: 800; color: var(--accent-dark); animation: pop 0.45s ease-out; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12); }
-
-#fx { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 30; }
-#fx .bit { position: absolute; top: -20px; width: 12px; height: 18px; border-radius: 3px; animation: fall linear forwards; }
-
-#loading { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; background: rgba(227, 246, 255, 0.92); z-index: 40; font-size: 20px; }
-.spinner { width: 64px; height: 64px; border-radius: 50%; border: 8px solid #ddd3ff; border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+#win-text { padding: 4px 22px; border-radius: 999px; background: #fff; font-size: clamp(30px, 6vmin, 52px); font-weight: 800; color: var(--accent-dark); animation: kit-pop 0.45s ease-out; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12); }
 
 @media (max-width: 700px) {
   #card { width: 84px; height: 64px; }
-  .tool { width: 48px; height: 48px; font-size: 22px; border-radius: 16px; }
+  #game .tool { width: 48px; height: 48px; font-size: 22px; border-radius: 16px; }
   .right { gap: 6px; }
   #game header { flex-wrap: wrap; }
   .info { order: 3; flex-basis: 100%; }
 }
-
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes bob { 50% { transform: translateY(-10px) rotate(-6deg); } }
-@keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
-@keyframes fall { to { transform: translate(var(--dx), 105vh) rotate(var(--r)); } }

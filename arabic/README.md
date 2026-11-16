@@ -33,5 +33,6 @@ Without one, the Azerbaijani reading (e.g. "səlasə") is spoken instead. Short 
 Azerbaijani or Turkish voice if the device has one; this can be turned off under *Böyüklər üçün*. The page shows
 which voices it found.
 
-Files: `index.html`, `style.css`, `js/main.js` (game), `js/numbers.js` (numbers, words, tracing guides),
-`js/hands.js` (hand tracking, smoothing, fist detection).
+Files: `index.html`, `style.css`, `js/main.js` (game), `js/numbers.js` (numbers, words, tracing guides).
+Hand tracking, smoothing, fist detection, the start screen and camera flow come from [`../common/`](../common/)
+(see [`docs/NEW_GAME.md`](../docs/NEW_GAME.md)).

@@ -1,0 +1,28 @@
+/* Star Catcher (starter game). The shared look comes from ../common/kit.css;
+   re-skin it by overriding its variables here, e.g.:
+   :root { --accent: #ff6b8b; --accent-dark: #d94a6b; --bg1: #fff4d6; } */
+
+#game header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(10px, env(safe-area-inset-top)) 12px 0;
+  z-index: 2;
+}
+#score { font-size: 40px; font-weight: 800; color: var(--accent-dark); }
+#score::before { content: "⭐ "; font-family: var(--emoji-font); }
+#field { position: absolute; inset: 0; }
+.star {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  margin: -55px 0 0 -55px;
+  display: grid;
+  place-items: center;
+  font-size: 80px;
+  font-family: var(--emoji-font);
+  animation: kit-pop 0.4s ease-out;
+  cursor: pointer;
+}
